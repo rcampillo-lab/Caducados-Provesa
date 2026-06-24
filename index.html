@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Caducados PROVESA</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="hero__brand">
+        <div class="logo-mark">P</div>
+        <div>
+          <h1>Caducados PROVESA</h1>
+          <p>Gestión informativa de stock por lote, entrada real y caducidad</p>
+        </div>
+      </div>
+      <div class="hero__actions">
+        <label class="upload-btn">
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" />
+          Cargar Excel SAP
+        </label>
+        <button id="exportBtn" class="secondary" disabled>Exportar vista</button>
+      </div>
+    </header>
+
+    <section class="status-card" id="statusCard">
+      <strong>Sin datos cargados.</strong>
+      <span>Exporta el resultado de la query desde SAP y carga aquí el Excel.</span>
+    </section>
+
+    <section class="filters-panel">
+      <div class="filter-row search-row">
+        <input id="searchInput" type="search" placeholder="Buscar artículo, descripción, lote, proveedor o cliente..." />
+        <button id="clearBtn" class="ghost">Limpiar filtros</button>
+      </div>
+
+      <div class="filter-grid">
+        <label>
+          Caducidad
+          <select id="expiryFilter">
+            <option value="all">Todos</option>
+            <option value="expired">Caducados</option>
+            <option value="30">≤ 30 días</option>
+            <option value="60">≤ 60 días</option>
+            <option value="90">≤ 90 días</option>
+            <option value="180">≤ 180 días</option>
+            <option value="365">≤ 365 días</option>
+          </select>
+        </label>
+        <label>
+          Tiempo en PROVESA
+          <select id="ageFilter">
+            <option value="all">Todos</option>
+            <option value="30">≥ 30 días</option>
+            <option value="60">≥ 60 días</option>
+            <option value="90">≥ 90 días</option>
+            <option value="180">≥ 180 días</option>
+            <option value="365">≥ 365 días</option>
+          </select>
+        </label>
+        <label>
+          Grupo artículo
+          <select id="groupFilter"><option value="all">Todos</option></select>
+        </label>
+        <label>
+          Frío
+          <select id="coldFilter">
+            <option value="all">Todos</option>
+            <option value="sí">Sí</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          Almacén con stock
+          <select id="warehouseFilter">
+            <option value="all">Todos</option>
+            <option value="01">Almacén 01</option>
+            <option value="02">Almacén 02</option>
+          </select>
+        </label>
+        <label>
+          Ordenar por
+          <select id="sortFilter">
+            <option value="expiry">Caducidad próxima</option>
+            <option value="age">Más tiempo en PROVESA</option>
+            <option value="stock">Mayor stock</option>
+            <option value="item">Nº artículo</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="Secciones">
+      <button class="tab active" data-tab="resumen">Resumen</button>
+      <button class="tab" data-tab="articulos">Artículos</button>
+      <button class="tab" data-tab="lotes">Lotes</button>
+      <button class="tab" data-tab="proximos">Próximos</button>
+      <button class="tab" data-tab="antiguo">Stock antiguo</button>
+      <button class="tab" data-tab="proveedores">Proveedores entrada</button>
+    </nav>
+
+    <main>
+      <section id="resumen" class="tab-panel active">
+        <div id="cards" class="cards"></div>
+        <div class="split-grid">
+          <article class="panel">
+            <h2>Caducidad por tramo</h2>
+            <div id="expiryBars" class="bars"></div>
+          </article>
+          <article class="panel">
+            <h2>Stock por almacén</h2>
+            <div id="warehouseBars" class="bars"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="articulos" class="tab-panel">
+        <div class="panel-header"><h2>Artículos agrupados</h2><span id="articlesCount"></span></div>
+        <div class="table-wrap"><table id="articlesTable"></table></div>
+      </section>
+
+      <section id="lotes" class="tab-panel">
+        <div class="panel-header"><h2>Lotes y entradas reales</h2><span id="lotsCount"></span></div>
+        <div class="table-wrap"><table id="lotsTable"></table></div>
+      </section>
+
+      <section id="proximos" class="tab-panel">
+        <div class="panel-header"><h2>Próximos a caducar</h2><span id="nextCount"></span></div>
+        <div class="table-wrap"><table id="nextTable"></table></div>
+      </section>
+
+      <section id="antiguo" class="tab-panel">
+        <div class="panel-header"><h2>Stock con más tiempo en PROVESA</h2><span id="oldCount"></span></div>
+        <div class="table-wrap"><table id="oldTable"></table></div>
+      </section>
+
+      <section id="proveedores" class="tab-panel">
+        <div class="panel-header"><h2>Proveedores de entrada</h2><span id="suppliersCount"></span></div>
+        <div class="table-wrap"><table id="suppliersTable"></table></div>
+      </section>
+    </main>
+  </div>
+
+  <template id="emptyTemplate">
+    <div class="empty-state">
+      <h3>No hay datos para mostrar</h3>
+      <p>Carga el Excel de SAP o modifica los filtros.</p>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
