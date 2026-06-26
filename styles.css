@@ -26,20 +26,33 @@ button, input, select { font: inherit; }
 button { cursor: pointer; }
 .app-shell { width: min(1500px, calc(100% - 28px)); margin: 18px auto 40px; }
 .hero {
-  display: flex; align-items: center; justify-content: space-between; gap: 18px;
-  padding: 24px; border-radius: 24px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
   background: linear-gradient(135deg, #0f4f9a, #1976d2 55%, #45a3ff);
-  color: white; box-shadow: var(--shadow);
+  color: white;
+  box-shadow: var(--shadow);
 }
-.hero__brand { display: flex; align-items: center; gap: 16px; }
-.logo-mark {
-  width: 58px; height: 58px; border-radius: 18px; display: grid; place-items: center;
-  background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35);
-  font-size: 30px; font-weight: 900;
+.hero--banner { min-height: 245px; }
+.hero__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1914 / 822;
+  object-fit: cover;
 }
-.hero h1 { margin: 0; font-size: clamp(28px, 4vw, 42px); letter-spacing: -.03em; }
-.hero p { margin: 4px 0 0; opacity: .9; }
 .hero__actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.hero__actions--floating {
+  position: absolute;
+  right: 22px;
+  top: 22px;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(4, 38, 83, .28);
+  border: 1px solid rgba(255,255,255,.28);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 35px rgba(0,0,0,.12);
+}
 .upload-btn, button.secondary, button.ghost {
   border: 0; border-radius: 14px; padding: 12px 16px; font-weight: 800;
 }
@@ -99,15 +112,16 @@ tr:hover td { background: #fbfdff; }
 .empty-state { background: white; border: 1px dashed var(--line); border-radius: var(--radius); padding: 40px; text-align: center; color: var(--muted); }
 .empty-state h3 { margin: 0 0 8px; color: var(--ink); }
 @media (max-width: 1100px) {
-  .hero { align-items: flex-start; flex-direction: column; }
   .hero__actions { justify-content: flex-start; }
+  .hero__actions--floating { position: static; margin: 10px; background: var(--blue-dark); }
   .filter-grid { grid-template-columns: repeat(3, 1fr); }
   .cards { grid-template-columns: repeat(3, 1fr); }
   .split-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
   .app-shell { width: min(100% - 18px, 1500px); margin-top: 9px; }
-  .hero { padding: 18px; border-radius: 18px; }
+  .hero { border-radius: 18px; }
+  .hero--banner { min-height: 0; }
   .search-row { grid-template-columns: 1fr; }
   .filter-grid { grid-template-columns: 1fr; }
   .cards { grid-template-columns: 1fr 1fr; }
