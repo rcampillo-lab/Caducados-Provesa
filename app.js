@@ -427,11 +427,38 @@ function exportView() {
     font: { bold: true, sz: 16 },
     alignment: { horizontal: 'left', vertical: 'center' }
   };
-  ws['!rows'] = [{ hpt: 24 }, { hpt: 8 }];
+  // Optimización de impresión: A4 horizontal, una página de ancho y columnas compactas.
+  ws['!rows'] = [{ hpt: 24 }, { hpt: 6 }, { hpt: 22 }];
   ws['!cols'] = [
-    { wch: 14 }, { wch: 42 }, { wch: 18 }, { wch: 15 }, { wch: 22 },
-    { wch: 12 }, { wch: 18 }, { wch: 36 }, { wch: 32 }, { wch: 18 }
+    { wch: 11 }, // Nº artículo
+    { wch: 32 }, // Descripción artículo
+    { wch: 13 }, // Lote
+    { wch: 12 }, // Fecha caducidad
+    { wch: 18 }, // Estado caducidad
+    { wch: 9 },  // Stock
+    { wch: 12 }, // Fecha entrada real
+    { wch: 24 }, // Último cliente
+    { wch: 24 }, // Proveedor entrada
+    { wch: 12 }  // Nº entrada mercancía
   ];
+  ws['!margins'] = {
+    left: 0.25,
+    right: 0.25,
+    top: 0.35,
+    bottom: 0.35,
+    header: 0.15,
+    footer: 0.15
+  };
+  ws['!pageSetup'] = {
+    paperSize: 9,          // A4
+    orientation: 'landscape',
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    horizontalCentered: true
+  };
+  ws['!autofilter'] = { ref: `A3:J${Math.max(3, data.length + 3)}` };
+  ws['!freeze'] = { xSplit: 0, ySplit: 3 };
 
   const wb = XLSX.utils.book_new();
   const sheetName = makeSheetNameFromFilters();

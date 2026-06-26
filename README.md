@@ -1,4 +1,4 @@
-# Caducados PROVESA v2.4 — Other / estática pura
+# Caducados PROVESA v2.5 — Other / estática pura
 
 App informativa para cargar el Excel de SAP generado por la query de caducados y analizar stock por artículo, lote, almacén, fecha de entrada real y caducidad.
 
@@ -38,7 +38,7 @@ No lleva `package.json`, `vite.config.js`, `vercel.json`, `src` ni `node_modules
 5. Exportar la vista filtrada si hace falta trabajar fuera de la app.
 
 
-## Cambios v2.4
+## Cambios v2.5
 
 - Una línea por `artículo + lote + almacén`.
 - Se elimina la visión de stock total + stock 01 + stock 02.
@@ -46,17 +46,25 @@ No lleva `package.json`, `vite.config.js`, `vercel.json`, `src` ni `node_modules
 - Tablas y exportación adaptadas a la nueva query v2.5.
 
 
-## Cambios v2.4
+## Cambios v2.5
 
 - El Excel de “Exportar vista” se ha depurado para uso externo.
 - La exportación elimina grupo, tipo, frío, almacén, días hasta caducidad, días en PROVESA, fecha de última compra y datos específicos del último albarán/lote.
 - El nombre del archivo exportado y la pestaña del Excel se generan según los filtros activos.
 
 
-## Cambios v2.4
+## Cambios v2.5
 
 - Exportación Excel con título en A1, tamaño 16 y negrita.
 - El título del Excel se genera según los filtros activos.
 - Eliminado el filtro de tiempo en PROVESA.
 - Sustituido el filtro de grupo de artículo por filtro de proveedor de entrada.
 - Corregido el filtro de caducidad: al filtrar por ≤ 30/60/90/180/365 días incluye también artículos ya caducados.
+
+
+## Cambios v2.5
+
+- Exportación Excel optimizada para impresión en A4 horizontal.
+- Ajuste a una página de ancho.
+- Márgenes estrechos y columnas compactas.
+- Autofiltro añadido en la tabla exportada.
