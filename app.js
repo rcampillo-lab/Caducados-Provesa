@@ -154,7 +154,7 @@ function badge(text, days) {
 
 function setup() {
   el('fileInput').addEventListener('change', onFile);
-  ['searchInput','expiryFilter','ageFilter','groupFilter','typeFilter','coldFilter','warehouseFilter','sortFilter'].forEach(id => {
+  ['searchInput','expiryFilter','supplierFilter','typeFilter','coldFilter','warehouseFilter','sortFilter'].forEach(id => {
     el(id).addEventListener('input', applyFilters);
     el(id).addEventListener('change', applyFilters);
   });
@@ -173,7 +173,7 @@ async function onFile(e) {
   const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
   state.raw = rows;
   state.rows = rows.map(mapRow).filter(r => r.item || r.desc || r.lot);
-  populateGroups();
+  populateSuppliers();
   populateTypes();
   populateWarehouses();
   el('exportBtn').disabled = state.rows.length === 0;
@@ -181,12 +181,12 @@ async function onFile(e) {
   applyFilters();
 }
 
-function populateGroups() {
-  const select = el('groupFilter');
+function populateSuppliers() {
+  const select = el('supplierFilter');
   const current = select.value;
-  const groups = [...new Set(state.rows.map(r => r.group).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'es'));
-  select.innerHTML = '<option value="all">Todos</option>' + groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
-  if (groups.includes(current)) select.value = current;
+  const suppliers = [...new Set(state.rows.map(r => r.supplier).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'es'));
+  select.innerHTML = '<option value="all">Todos</option>' + suppliers.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  if (suppliers.includes(current)) select.value = current;
 }
 
 function populateTypes() {
@@ -208,8 +208,7 @@ function populateWarehouses() {
 function clearFilters() {
   el('searchInput').value = '';
   el('expiryFilter').value = 'all';
-  el('ageFilter').value = 'all';
-  el('groupFilter').value = 'all';
+  el('supplierFilter').value = 'all';
   el('typeFilter').value = 'all';
   el('coldFilter').value = 'all';
   el('warehouseFilter').value = 'all';
@@ -220,8 +219,7 @@ function clearFilters() {
 function applyFilters() {
   const q = normKey(el('searchInput').value);
   const expiry = el('expiryFilter').value;
-  const age = el('ageFilter').value;
-  const group = el('groupFilter').value;
+  const supplier = el('supplierFilter').value;
   const type = el('typeFilter').value;
   const cold = el('coldFilter').value;
   const wh = el('warehouseFilter').value;
@@ -231,9 +229,8 @@ function applyFilters() {
     const hay = normKey([r.item, r.desc, r.group, r.type, r.lot, r.warehouse, r.supplier, r.lastArticleClient, r.lastLotClient].join(' '));
     if (q && !hay.includes(q)) return false;
     if (expiry === 'expired' && !(r.daysExp < 0)) return false;
-    if (!['all','expired'].includes(expiry) && !(r.daysExp !== null && r.daysExp <= Number(expiry) && r.daysExp >= 0)) return false;
-    if (age !== 'all' && !(r.daysInProvesa !== null && r.daysInProvesa >= Number(age))) return false;
-    if (group !== 'all' && r.group !== group) return false;
+    if (!['all','expired'].includes(expiry) && !(r.daysExp !== null && r.daysExp <= Number(expiry))) return false;
+    if (supplier !== 'all' && r.supplier !== supplier) return false;
     if (type !== 'all' && r.type !== type) return false;
     if (cold !== 'all' && normKey(r.cold) !== cold) return false;
     if (wh !== 'all' && r.warehouse !== wh) return false;
@@ -409,6 +406,7 @@ function renderTable(id, data, cols) {
 }
 
 function exportView() {
+  const title = makeExportTitle();
   const data = state.filtered.map(r => ({
     'Nº artículo': r.item,
     'Descripción artículo': r.desc,
@@ -422,19 +420,35 @@ function exportView() {
     'Nº entrada mercancía': r.entryDoc,
   }));
 
-  const ws = XLSX.utils.json_to_sheet(data);
+  const ws = XLSX.utils.aoa_to_sheet([[title], []]);
+  XLSX.utils.sheet_add_json(ws, data, { origin: 'A3' });
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }];
+  ws['A1'].s = {
+    font: { bold: true, sz: 16 },
+    alignment: { horizontal: 'left', vertical: 'center' }
+  };
+  ws['!rows'] = [{ hpt: 24 }, { hpt: 8 }];
+  ws['!cols'] = [
+    { wch: 14 }, { wch: 42 }, { wch: 18 }, { wch: 15 }, { wch: 22 },
+    { wch: 12 }, { wch: 18 }, { wch: 36 }, { wch: 32 }, { wch: 18 }
+  ];
+
   const wb = XLSX.utils.book_new();
   const sheetName = makeSheetNameFromFilters();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, `${makeFileNameFromFilters()}.xlsx`);
 }
 
+function makeExportTitle() {
+  const parts = activeFilterParts();
+  return parts.length ? `Caducados PROVESA - ${parts.join(' - ')}` : 'Caducados PROVESA - Todos';
+}
+
 function activeFilterParts() {
   const parts = [];
   const q = norm(el('searchInput').value);
   const expiry = el('expiryFilter').value;
-  const age = el('ageFilter').value;
-  const group = el('groupFilter').value;
+  const supplier = el('supplierFilter').value;
   const type = el('typeFilter').value;
   const cold = el('coldFilter').value;
   const wh = el('warehouseFilter').value;
@@ -442,10 +456,9 @@ function activeFilterParts() {
   if (q) parts.push(`busqueda ${q}`);
   if (expiry === 'expired') parts.push('caducados');
   else if (expiry !== 'all') parts.push(`caduca ${expiry} dias`);
-  if (age !== 'all') parts.push(`en PROVESA ${age} dias`);
-  if (group !== 'all') parts.push(group);
+  if (supplier !== 'all') parts.push(supplier);
   if (type !== 'all') parts.push(type);
-  if (cold !== 'all') parts.push(cold === 'si' ? 'frio' : 'no frio');
+  if (cold !== 'all') parts.push(normKey(cold) === 'si' ? 'frio' : 'no frio');
   if (wh !== 'all') parts.push(`almacen ${wh}`);
 
   return parts;
