@@ -412,28 +412,72 @@ function exportView() {
   const data = state.filtered.map(r => ({
     'Nº artículo': r.item,
     'Descripción artículo': r.desc,
-    'Grupo artículo': r.group,
-    'Tipo artículo': r.type,
-    'Artículo frío': r.cold,
     'Lote': r.lot,
-    'Almacén': r.warehouse,
     'Fecha caducidad': fmtDate(r.exp),
-    'Días hasta caducidad': r.daysExp,
     'Estado caducidad': r.status,
     'Stock': r.stock,
     'Fecha entrada real': fmtDate(r.entryDate),
-    'Días en PROVESA': r.daysInProvesa,
-    'Fecha última compra artículo': fmtDate(r.lastPurchaseDate),
     'Último cliente que compró artículo': r.lastArticleClient,
-    'Fecha último albarán lote': fmtDate(r.lastLotSaleDate),
-    'Último cliente que compró lote': r.lastLotClient,
     'Proveedor entrada': r.supplier,
     'Nº entrada mercancía': r.entryDoc,
   }));
+
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Caducados filtrado');
-  XLSX.writeFile(wb, 'caducados_provesa_filtrado.xlsx');
+  const sheetName = makeSheetNameFromFilters();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, `${makeFileNameFromFilters()}.xlsx`);
+}
+
+function activeFilterParts() {
+  const parts = [];
+  const q = norm(el('searchInput').value);
+  const expiry = el('expiryFilter').value;
+  const age = el('ageFilter').value;
+  const group = el('groupFilter').value;
+  const type = el('typeFilter').value;
+  const cold = el('coldFilter').value;
+  const wh = el('warehouseFilter').value;
+
+  if (q) parts.push(`busqueda ${q}`);
+  if (expiry === 'expired') parts.push('caducados');
+  else if (expiry !== 'all') parts.push(`caduca ${expiry} dias`);
+  if (age !== 'all') parts.push(`en PROVESA ${age} dias`);
+  if (group !== 'all') parts.push(group);
+  if (type !== 'all') parts.push(type);
+  if (cold !== 'all') parts.push(cold === 'si' ? 'frio' : 'no frio');
+  if (wh !== 'all') parts.push(`almacen ${wh}`);
+
+  return parts;
+}
+
+function makeFileNameFromFilters() {
+  const parts = activeFilterParts();
+  const suffix = parts.length ? parts.join('_') : 'todos';
+  return sanitizeFileName(`caducados_provesa_${suffix}`);
+}
+
+function makeSheetNameFromFilters() {
+  const parts = activeFilterParts();
+  const name = parts.length ? parts.join(' - ') : 'Todos';
+  return sanitizeSheetName(name) || 'Caducados';
+}
+
+function sanitizeFileName(value) {
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9ñÑ_-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 120) || 'caducados_provesa';
+}
+
+function sanitizeSheetName(value) {
+  return String(value || '')
+    .replace(/[\/\?\*\[\]:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 31);
 }
 
 function escapeHtml(value) {
