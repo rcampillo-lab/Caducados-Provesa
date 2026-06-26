@@ -1,6 +1,6 @@
-# Caducados PROVESA v2.1 — Other / estática pura
+# Caducados PROVESA v2.2 — Other / estática pura
 
-App informativa para cargar el Excel de SAP generado por la query de caducados y analizar stock por artículo, lote, fecha de entrada real y caducidad.
+App informativa para cargar el Excel de SAP generado por la query de caducados y analizar stock por artículo, lote, almacén, fecha de entrada real y caducidad.
 
 ## Enfoque
 
@@ -34,5 +34,13 @@ No lleva `package.json`, `vite.config.js`, `vercel.json`, `src` ni `node_modules
 1. Abrir la app.
 2. Pulsar **Cargar Excel SAP**.
 3. Seleccionar el Excel exportado desde SAP.
-4. Usar los filtros por caducidad, tiempo en PROVESA, grupo, frío, almacén y búsqueda.
+4. Usar los filtros por caducidad, tiempo en PROVESA, grupo, tipo artículo, frío, almacén y búsqueda.
 5. Exportar la vista filtrada si hace falta trabajar fuera de la app.
+
+
+## Cambios v2.2
+
+- Una línea por `artículo + lote + almacén`.
+- Se elimina la visión de stock total + stock 01 + stock 02.
+- Nueva columna y filtro `Tipo artículo`: Compañía / Producción / Compañía y producción / Sin propiedad.
+- Tablas y exportación adaptadas a la nueva query v2.5.

@@ -61,7 +61,7 @@ input[type="search"], select {
   padding: 12px 13px; outline: none;
 }
 input[type="search"]:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(23,103,194,.12); }
-.filter-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .filter-grid label { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .filter-grid select { margin-top: 6px; font-size: 14px; font-weight: 600; text-transform: none; letter-spacing: 0; }
 .tabs { display: flex; gap: 8px; overflow-x: auto; margin: 18px 0 14px; padding-bottom: 3px; }

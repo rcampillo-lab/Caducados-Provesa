@@ -9,14 +9,14 @@ const COLS = {
   item: ['Nº artículo', 'No artículo', 'Número de artículo', 'ItemCode'],
   desc: ['Descripción artículo', 'Descripcion articulo', 'Descripción de artículo', 'ItemName'],
   group: ['Grupo artículo', 'Grupo articulo', 'Grupo de artículos', 'Grupo de articulo'],
+  type: ['Tipo artículo', 'Tipo articulo'],
   cold: ['Artículo frío', 'Articulo frio', 'Frío', 'Frio'],
   lot: ['Lote', 'BatchNum', 'Número de lote'],
   exp: ['Fecha caducidad', 'Caducidad', 'ExpDate'],
   daysExp: ['Días hasta caducidad', 'Dias hasta caducidad'],
   status: ['Estado caducidad'],
-  stock: ['Stock lote total', 'Stock actual lote', 'Stock'],
-  stock01: ['Stock almacén 01', 'Stock almacen 01'],
-  stock02: ['Stock almacén 02', 'Stock almacen 02'],
+  warehouse: ['Almacén', 'Almacen'],
+  stock: ['Stock', 'Stock lote total', 'Stock actual lote'],
   entryDate: ['Fecha entrada real'],
   entryDoc: ['Nº entrada mercancía', 'No entrada mercancía', 'Nº entrada mercancia'],
   supplier: ['Proveedor entrada'],
@@ -106,14 +106,14 @@ function mapRow(row) {
     item: norm(get(row, COLS.item)),
     desc: norm(get(row, COLS.desc)),
     group: norm(get(row, COLS.group)) || 'Sin grupo',
+    type: norm(get(row, COLS.type)) || 'Sin propiedad',
     cold: cold || 'No',
     lot: norm(get(row, COLS.lot)),
     exp,
     daysExp: Number.isFinite(daysExp) ? daysExp : null,
     status: norm(get(row, COLS.status)) || statusFromDays(daysExp),
+    warehouse: norm(get(row, COLS.warehouse)) || norm(get(row, COLS.entryWarehouse)),
     stock: parseNumber(get(row, COLS.stock)),
-    stock01: parseNumber(get(row, COLS.stock01)),
-    stock02: parseNumber(get(row, COLS.stock02)),
     entryDate: entry,
     daysInProvesa,
     entryDoc: norm(get(row, COLS.entryDoc)),
@@ -154,7 +154,7 @@ function badge(text, days) {
 
 function setup() {
   el('fileInput').addEventListener('change', onFile);
-  ['searchInput','expiryFilter','ageFilter','groupFilter','coldFilter','warehouseFilter','sortFilter'].forEach(id => {
+  ['searchInput','expiryFilter','ageFilter','groupFilter','typeFilter','coldFilter','warehouseFilter','sortFilter'].forEach(id => {
     el(id).addEventListener('input', applyFilters);
     el(id).addEventListener('change', applyFilters);
   });
@@ -174,6 +174,8 @@ async function onFile(e) {
   state.raw = rows;
   state.rows = rows.map(mapRow).filter(r => r.item || r.desc || r.lot);
   populateGroups();
+  populateTypes();
+  populateWarehouses();
   el('exportBtn').disabled = state.rows.length === 0;
   el('statusCard').innerHTML = `<strong>${state.rows.length.toLocaleString('es-ES')} líneas cargadas.</strong><span>${file.name}</span>`;
   applyFilters();
@@ -187,11 +189,28 @@ function populateGroups() {
   if (groups.includes(current)) select.value = current;
 }
 
+function populateTypes() {
+  const select = el('typeFilter');
+  const current = select.value;
+  const types = [...new Set(state.rows.map(r => r.type).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'es'));
+  select.innerHTML = '<option value="all">Todos</option>' + types.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  if (types.includes(current)) select.value = current;
+}
+
+function populateWarehouses() {
+  const select = el('warehouseFilter');
+  const current = select.value;
+  const warehouses = [...new Set(state.rows.map(r => r.warehouse).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'es'));
+  select.innerHTML = '<option value="all">Todos</option>' + warehouses.map(w => `<option value="${escapeHtml(w)}">Almacén ${escapeHtml(w)}</option>`).join('');
+  if (warehouses.includes(current)) select.value = current;
+}
+
 function clearFilters() {
   el('searchInput').value = '';
   el('expiryFilter').value = 'all';
   el('ageFilter').value = 'all';
   el('groupFilter').value = 'all';
+  el('typeFilter').value = 'all';
   el('coldFilter').value = 'all';
   el('warehouseFilter').value = 'all';
   el('sortFilter').value = 'expiry';
@@ -203,20 +222,21 @@ function applyFilters() {
   const expiry = el('expiryFilter').value;
   const age = el('ageFilter').value;
   const group = el('groupFilter').value;
+  const type = el('typeFilter').value;
   const cold = el('coldFilter').value;
   const wh = el('warehouseFilter').value;
   const sort = el('sortFilter').value;
 
   state.filtered = state.rows.filter(r => {
-    const hay = normKey([r.item, r.desc, r.group, r.lot, r.supplier, r.lastArticleClient, r.lastLotClient].join(' '));
+    const hay = normKey([r.item, r.desc, r.group, r.type, r.lot, r.warehouse, r.supplier, r.lastArticleClient, r.lastLotClient].join(' '));
     if (q && !hay.includes(q)) return false;
     if (expiry === 'expired' && !(r.daysExp < 0)) return false;
     if (!['all','expired'].includes(expiry) && !(r.daysExp !== null && r.daysExp <= Number(expiry) && r.daysExp >= 0)) return false;
     if (age !== 'all' && !(r.daysInProvesa !== null && r.daysInProvesa >= Number(age))) return false;
     if (group !== 'all' && r.group !== group) return false;
+    if (type !== 'all' && r.type !== type) return false;
     if (cold !== 'all' && normKey(r.cold) !== cold) return false;
-    if (wh === '01' && !(r.stock01 > 0)) return false;
-    if (wh === '02' && !(r.stock02 > 0)) return false;
+    if (wh !== 'all' && r.warehouse !== wh) return false;
     return true;
   });
 
@@ -248,24 +268,21 @@ function render() {
 function renderSummary() {
   const rows = state.filtered;
   const uniqueItems = new Set(rows.map(r => r.item)).size;
-  const uniqueLots = new Set(rows.map(r => `${r.item}__${r.lot}`)).size;
+  const uniqueLots = new Set(rows.map(r => `${r.item}__${r.lot}__${r.warehouse}`)).size;
   const stock = rows.reduce((s,r) => s + r.stock, 0);
   const expired = rows.filter(r => r.daysExp < 0).reduce((s,r) => s + r.stock, 0);
   const soon90 = rows.filter(r => r.daysExp >= 0 && r.daysExp <= 90).reduce((s,r) => s + r.stock, 0);
   const old180 = rows.filter(r => r.daysInProvesa >= 180).reduce((s,r) => s + r.stock, 0);
   el('cards').innerHTML = [
     card('Artículos', fmtNum(uniqueItems), 'con stock filtrado'),
-    card('Lotes', fmtNum(uniqueLots), 'lote + artículo'),
+    card('Lotes/almacén', fmtNum(uniqueLots), 'artículo + lote + almacén'),
     card('Stock total', fmtNum(stock, 2), 'unidades'),
     card('Caducado', fmtNum(expired, 2), 'unidades'),
     card('≤ 90 días', fmtNum(soon90, 2), 'unidades'),
     card('≥ 180 días aquí', fmtNum(old180, 2), 'unidades'),
   ].join('');
   renderBars('expiryBars', groupExpiry(rows));
-  renderBars('warehouseBars', [
-    ['Almacén 01', rows.reduce((s,r) => s + r.stock01, 0)],
-    ['Almacén 02', rows.reduce((s,r) => s + r.stock02, 0)],
-  ]);
+  renderBars('warehouseBars', groupByWarehouse(rows));
 }
 
 function card(label, value, note) {
@@ -285,6 +302,15 @@ function groupExpiry(rows) {
   return buckets.map(([name, fn]) => [name, rows.filter(fn).reduce((s,r) => s + r.stock, 0)]);
 }
 
+function groupByWarehouse(rows) {
+  const map = new Map();
+  for (const r of rows) {
+    const key = r.warehouse || 'Sin almacén';
+    map.set(key, (map.get(key) || 0) + r.stock);
+  }
+  return [...map.entries()].sort((a,b) => a[0].localeCompare(b[0], 'es')).map(([w, stock]) => [`Almacén ${w}`, stock]);
+}
+
 function renderBars(id, data) {
   const max = Math.max(...data.map(x => x[1]), 1);
   el(id).innerHTML = data.map(([name, value]) => `
@@ -300,9 +326,10 @@ function renderArticles() {
   const map = new Map();
   for (const r of state.filtered) {
     const key = r.item;
-    const x = map.get(key) || { item: r.item, desc: r.desc, group: r.group, cold: r.cold, stock: 0, lots: new Set(), minDays: null, maxAge: null, lastClient: '', lastSale: null };
+    const x = map.get(key) || { item: r.item, desc: r.desc, group: r.group, types: new Set(), cold: r.cold, stock: 0, lots: new Set(), minDays: null, maxAge: null, lastClient: '', lastSale: null };
     x.stock += r.stock;
-    x.lots.add(r.lot);
+    x.types.add(r.type);
+    x.lots.add(`${r.lot}_${r.warehouse}`);
     x.minDays = x.minDays === null ? r.daysExp : Math.min(x.minDays, r.daysExp ?? 999999);
     x.maxAge = x.maxAge === null ? r.daysInProvesa : Math.max(x.maxAge, r.daysInProvesa ?? -1);
     if (!x.lastSale || (parseDate(r.lastArticleSaleDate) || 0) > (parseDate(x.lastSale) || 0)) {
@@ -314,7 +341,7 @@ function renderArticles() {
   const data = [...map.values()].sort((a,b) => (a.minDays ?? 999999) - (b.minDays ?? 999999));
   el('articlesCount').textContent = `${data.length.toLocaleString('es-ES')} artículos`;
   renderTable('articlesTable', data, [
-    ['Nº artículo', x => x.item], ['Descripción', x => x.desc], ['Grupo', x => x.group], ['Frío', x => x.cold],
+    ['Nº artículo', x => x.item], ['Descripción', x => x.desc], ['Grupo', x => x.group], ['Tipo', x => [...x.types].join(' / ')], ['Frío', x => x.cold],
     ['Stock', x => fmtNum(x.stock, 2), 'num'], ['Lotes', x => fmtNum(x.lots.size), 'num'],
     ['Caducidad mínima', x => badge(statusFromDays(x.minDays), x.minDays)], ['Días', x => fmtNum(x.minDays), 'num'],
     ['Máx. días en PROVESA', x => fmtNum(x.maxAge), 'num'], ['Último cliente', x => x.lastClient || ''], ['Fecha último albarán', x => fmtDate(x.lastSale)],
@@ -344,7 +371,7 @@ function renderSuppliers() {
   for (const r of state.filtered) {
     const key = r.supplier || 'Sin proveedor';
     const x = map.get(key) || { supplier: key, items: new Set(), lots: new Set(), stock: 0, minDays: null, old: 0 };
-    x.items.add(r.item); x.lots.add(`${r.item}_${r.lot}`); x.stock += r.stock;
+    x.items.add(r.item); x.lots.add(`${r.item}_${r.lot}_${r.warehouse}`); x.stock += r.stock;
     x.minDays = x.minDays === null ? r.daysExp : Math.min(x.minDays, r.daysExp ?? 999999);
     if ((r.daysInProvesa ?? 0) >= 180) x.old += r.stock;
     map.set(key, x);
@@ -360,9 +387,9 @@ function renderSuppliers() {
 
 function lotColumns() {
   return [
-    ['Nº artículo', r => r.item], ['Descripción', r => r.desc], ['Grupo', r => r.group], ['Frío', r => r.cold],
-    ['Lote', r => r.lot], ['Caducidad', r => fmtDate(r.exp)], ['Estado', r => badge(r.status, r.daysExp)], ['Días cad.', r => fmtNum(r.daysExp), 'num'],
-    ['Stock', r => fmtNum(r.stock, 2), 'num'], ['Stock 01', r => fmtNum(r.stock01, 2), 'num'], ['Stock 02', r => fmtNum(r.stock02, 2), 'num'],
+    ['Nº artículo', r => r.item], ['Descripción', r => r.desc], ['Grupo', r => r.group], ['Tipo', r => r.type], ['Frío', r => r.cold],
+    ['Lote', r => r.lot], ['Almacén', r => r.warehouse], ['Stock', r => fmtNum(r.stock, 2), 'num'],
+    ['Caducidad', r => fmtDate(r.exp)], ['Estado', r => badge(r.status, r.daysExp)], ['Días cad.', r => fmtNum(r.daysExp), 'num'],
     ['Entrada real', r => fmtDate(r.entryDate)], ['Días en PROVESA', r => fmtNum(r.daysInProvesa), 'num'],
     ['Última compra', r => fmtDate(r.lastPurchaseDate)], ['Último cliente artículo', r => r.lastArticleClient], ['Último cliente lote', r => r.lastLotClient],
     ['Proveedor entrada', r => r.supplier], ['Nº entrada', r => r.entryDoc]
@@ -386,14 +413,14 @@ function exportView() {
     'Nº artículo': r.item,
     'Descripción artículo': r.desc,
     'Grupo artículo': r.group,
+    'Tipo artículo': r.type,
     'Artículo frío': r.cold,
     'Lote': r.lot,
+    'Almacén': r.warehouse,
     'Fecha caducidad': fmtDate(r.exp),
     'Días hasta caducidad': r.daysExp,
     'Estado caducidad': r.status,
-    'Stock lote total': r.stock,
-    'Stock almacén 01': r.stock01,
-    'Stock almacén 02': r.stock02,
+    'Stock': r.stock,
     'Fecha entrada real': fmtDate(r.entryDate),
     'Días en PROVESA': r.daysInProvesa,
     'Fecha última compra artículo': fmtDate(r.lastPurchaseDate),

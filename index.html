@@ -33,7 +33,7 @@
 
     <section class="filters-panel">
       <div class="filter-row search-row">
-        <input id="searchInput" type="search" placeholder="Buscar artículo, descripción, lote, proveedor o cliente..." />
+        <input id="searchInput" type="search" placeholder="Buscar artículo, descripción, lote, almacén, proveedor o cliente..." />
         <button id="clearBtn" class="ghost">Limpiar filtros</button>
       </div>
 
@@ -66,6 +66,10 @@
           <select id="groupFilter"><option value="all">Todos</option></select>
         </label>
         <label>
+          Tipo artículo
+          <select id="typeFilter"><option value="all">Todos</option></select>
+        </label>
+        <label>
           Frío
           <select id="coldFilter">
             <option value="all">Todos</option>
@@ -74,12 +78,8 @@
           </select>
         </label>
         <label>
-          Almacén con stock
-          <select id="warehouseFilter">
-            <option value="all">Todos</option>
-            <option value="01">Almacén 01</option>
-            <option value="02">Almacén 02</option>
-          </select>
+          Almacén
+          <select id="warehouseFilter"><option value="all">Todos</option></select>
         </label>
         <label>
           Ordenar por
