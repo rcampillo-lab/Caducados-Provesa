@@ -1,4 +1,5 @@
 const DEFAULT_POLICY_DAYS = 365;
+const CLAIMS_STORAGE_KEY = 'provesaCaducadosClaimsV1';
 
 const state = {
   raw: [],
@@ -9,6 +10,8 @@ const state = {
   policyFileName: '',
   policyLoaded: false,
   dataFileName: '',
+  claims: {},
+  selectedClaimIds: new Set(),
 };
 
 const COLS = {
@@ -122,6 +125,212 @@ function todayDateOnly() {
   return today;
 }
 
+
+function toIsoDate(value) {
+  const d = parseDate(value);
+  if (!d) return '';
+  d.setHours(0, 0, 0, 0);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function safeIdPart(value, fallback = '') {
+  const v = norm(value) || fallback;
+  return v.replace(/\|/g, '/');
+}
+
+function makeClaimId(row) {
+  return [
+    safeIdPart(row.item, 'SIN_ARTICULO'),
+    safeIdPart(row.lot, 'SIN_LOTE'),
+    safeIdPart(row.warehouse, 'SIN_ALMACEN'),
+    safeIdPart(toIsoDate(row.exp), 'SIN_CADUCIDAD'),
+    safeIdPart(row.entryDoc, 'SIN_ENTRADA'),
+    safeIdPart(row.supplier, 'SIN_PROVEEDOR'),
+  ].join('|');
+}
+
+function assignClaimId(row) {
+  row.claimId = makeClaimId(row);
+  return row;
+}
+
+function loadClaims() {
+  try {
+    const saved = localStorage.getItem(CLAIMS_STORAGE_KEY);
+    state.claims = saved ? JSON.parse(saved) : {};
+  } catch (err) {
+    state.claims = {};
+  }
+}
+
+function saveClaims() {
+  try {
+    localStorage.setItem(CLAIMS_STORAGE_KEY, JSON.stringify(state.claims));
+  } catch (err) {
+    alert('No se han podido guardar las reclamaciones en este navegador. Revisa si el almacenamiento local está bloqueado.');
+  }
+}
+
+function applyClaimsToRows() {
+  for (const row of state.rows) {
+    if (!row.claimId) assignClaimId(row);
+    row.claim = state.claims[row.claimId] || null;
+  }
+}
+
+function hasClaim(row) {
+  return Boolean(row.claim || state.claims[row.claimId]);
+}
+
+function currentClaim(row) {
+  return row.claim || state.claims[row.claimId] || null;
+}
+
+function claimBadge(status) {
+  const s = status || 'Pendiente';
+  let cls = 'blue';
+  if (s === 'Reclamado') cls = 'orange';
+  else if (s === 'En trámite') cls = 'yellow';
+  else if (s === 'Aceptado' || s === 'Abonado') cls = 'green';
+  else if (s === 'Rechazado' || s === 'No reclamar') cls = 'red';
+  return `<span class="badge ${cls}">${escapeHtml(s)}</span>`;
+}
+
+function claimCheckbox(row) {
+  const checked = state.selectedClaimIds.has(row.claimId) ? 'checked' : '';
+  return `<input type="checkbox" class="claim-checkbox" data-claim-id="${escapeHtml(row.claimId)}" ${checked} aria-label="Seleccionar línea" />`;
+}
+
+function getRowsById() {
+  const map = new Map();
+  for (const row of state.rows) map.set(row.claimId, row);
+  return map;
+}
+
+function selectedRows() {
+  const map = getRowsById();
+  return [...state.selectedClaimIds].map(id => map.get(id)).filter(Boolean);
+}
+
+function updateSelectedCount() {
+  const count = selectedRows().length;
+  const selected = el('selectedCount');
+  if (selected) selected.textContent = `${count.toLocaleString('es-ES')} seleccionada${count === 1 ? '' : 's'}`;
+  const claimBtn = el('claimSelectedBtn');
+  const unclaimBtn = el('unclaimSelectedBtn');
+  if (claimBtn) claimBtn.disabled = count === 0;
+  if (unclaimBtn) unclaimBtn.disabled = count === 0;
+}
+
+function onDocumentChange(event) {
+  const target = event.target;
+  if (!target.classList || !target.classList.contains('claim-checkbox')) return;
+  const id = target.dataset.claimId;
+  if (!id) return;
+  if (target.checked) state.selectedClaimIds.add(id);
+  else state.selectedClaimIds.delete(id);
+  updateSelectedCount();
+}
+
+function markSelectedClaims() {
+  const rows = selectedRows();
+  if (!rows.length) {
+    alert('Selecciona al menos una línea.');
+    return;
+  }
+
+  const status = el('claimStatusAction').value || 'Reclamado';
+  const note = norm(el('claimNoteInput').value);
+  const now = new Date().toISOString();
+
+  for (const row of rows) {
+    const previous = state.claims[row.claimId] || {};
+    state.claims[row.claimId] = {
+      id: row.claimId,
+      status,
+      note: note || previous.note || '',
+      updatedAt: now,
+      item: row.item,
+      desc: row.desc,
+      lot: row.lot,
+      warehouse: row.warehouse,
+      exp: toIsoDate(row.exp),
+      supplier: row.supplier,
+      entryDoc: row.entryDoc,
+      stock: row.stock,
+    };
+  }
+
+  saveClaims();
+  applyClaimsToRows();
+  state.selectedClaimIds.clear();
+  el('claimNoteInput').value = '';
+  applyFilters();
+}
+
+function unclaimSelected() {
+  const rows = selectedRows();
+  if (!rows.length) {
+    alert('Selecciona al menos una línea.');
+    return;
+  }
+
+  for (const row of rows) delete state.claims[row.claimId];
+  saveClaims();
+  applyClaimsToRows();
+  state.selectedClaimIds.clear();
+  applyFilters();
+}
+
+function clearAllClaims() {
+  const total = Object.keys(state.claims).length;
+  if (!total) return;
+  const ok = confirm(`Vas a borrar ${total.toLocaleString('es-ES')} reclamación(es) guardadas en este navegador. ¿Continuar?`);
+  if (!ok) return;
+  state.claims = {};
+  state.selectedClaimIds.clear();
+  saveClaims();
+  applyClaimsToRows();
+  applyFilters();
+}
+
+function exportClaims() {
+  const values = Object.values(state.claims);
+  if (!values.length) {
+    alert('No hay reclamaciones guardadas para exportar.');
+    return;
+  }
+
+  const data = values
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
+    .map(c => ({
+      'Estado reclamación': c.status || '',
+      'Nota reclamación': c.note || '',
+      'Fecha gestión': c.updatedAt ? new Date(c.updatedAt).toLocaleString('es-ES') : '',
+      'Nº artículo': c.item || '',
+      'Descripción artículo': c.desc || '',
+      'Lote': c.lot || '',
+      'Almacén': c.warehouse || '',
+      'Fecha caducidad': c.exp || '',
+      'Stock al marcar': c.stock || 0,
+      'Proveedor entrada': c.supplier || '',
+      'Nº entrada mercancía': c.entryDoc || '',
+      'ID caducidad': c.id || '',
+    }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [
+    { wch: 18 }, { wch: 35 }, { wch: 20 }, { wch: 11 }, { wch: 35 }, { wch: 15 },
+    { wch: 10 }, { wch: 14 }, { wch: 13 }, { wch: 28 }, { wch: 14 }, { wch: 70 }
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Reclamaciones');
+  XLSX.writeFile(wb, 'reclamaciones_caducidad_provesa.xlsx');
+}
+
 function currentMonthStartDate() {
   const today = todayDateOnly();
   return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -229,13 +438,19 @@ function policyBadge(status) {
 }
 
 function setup() {
+  loadClaims();
   el('fileInput').addEventListener('change', onFile);
-  ['searchInput','expiryFilter','supplierFilter','policyFilter','typeFilter','coldFilter','warehouseFilter','sortFilter'].forEach(id => {
+  ['searchInput','expiryFilter','supplierFilter','policyFilter','claimFilter','typeFilter','coldFilter','warehouseFilter','sortFilter'].forEach(id => {
     el(id).addEventListener('input', applyFilters);
     el(id).addEventListener('change', applyFilters);
   });
   el('clearBtn').addEventListener('click', clearFilters);
   el('exportBtn').addEventListener('click', exportView);
+  el('claimSelectedBtn').addEventListener('click', markSelectedClaims);
+  el('unclaimSelectedBtn').addEventListener('click', unclaimSelected);
+  el('exportClaimsBtn').addEventListener('click', exportClaims);
+  el('clearClaimsBtn').addEventListener('click', clearAllClaims);
+  document.addEventListener('change', onDocumentChange);
   document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
   render();
   autoLoadDefaultPolicies();
@@ -259,6 +474,7 @@ function loadPolicyWorkbook(wb, fileName) {
   state.policyLoaded = state.policyRules.size > 0;
   state.policyFileName = fileName || '';
   enrichRowsWithPolicy();
+  applyClaimsToRows();
   updateStatusCard();
   if (state.rows.length) applyFilters();
 }
@@ -350,8 +566,9 @@ async function onFile(e) {
   const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
   state.raw = rows;
   state.dataFileName = file.name;
-  state.rows = rows.map(mapRow).filter(r => r.item || r.desc || r.lot);
+  state.rows = rows.map(mapRow).filter(r => r.item || r.desc || r.lot).map(assignClaimId);
   enrichRowsWithPolicy();
+  applyClaimsToRows();
   populateSuppliers();
   populateTypes();
   populateWarehouses();
@@ -389,6 +606,7 @@ function clearFilters() {
   el('expiryFilter').value = 'all';
   el('supplierFilter').value = 'all';
   el('policyFilter').value = 'all';
+  el('claimFilter').value = 'pending';
   el('typeFilter').value = 'all';
   el('coldFilter').value = 'all';
   el('warehouseFilter').value = 'all';
@@ -402,6 +620,7 @@ function getFilterValues() {
     expiry: el('expiryFilter').value,
     supplier: el('supplierFilter').value,
     policy: el('policyFilter').value,
+    claim: el('claimFilter').value,
     type: el('typeFilter').value,
     cold: el('coldFilter').value,
     wh: el('warehouseFilter').value,
@@ -425,6 +644,10 @@ function rowMatchesFilters(r, filters, exclude = '') {
 
   if (exclude !== 'supplier' && filters.supplier !== 'all' && r.supplier !== filters.supplier) return false;
   if (exclude !== 'policy' && filters.policy !== 'all' && r.policyStatus !== filters.policy) return false;
+  if (exclude !== 'claim') {
+    if (filters.claim === 'pending' && hasClaim(r)) return false;
+    if (filters.claim === 'claimed' && !hasClaim(r)) return false;
+  }
   if (exclude !== 'type' && filters.type !== 'all' && r.type !== filters.type) return false;
   if (exclude !== 'cold' && filters.cold !== 'all' && coldFilterKey(r.cold) !== filters.cold) return false;
   if (exclude !== 'warehouse' && filters.wh !== 'all' && r.warehouse !== filters.wh) return false;
@@ -535,9 +758,14 @@ function applyFilters() {
 
 function setTab(tab) {
   state.activeTab = tab;
+  const claimFilter = el('claimFilter');
+  if (claimFilter) {
+    if (tab === 'reclamados') claimFilter.value = 'claimed';
+    else if (claimFilter.value === 'claimed') claimFilter.value = 'pending';
+  }
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === tab));
-  render();
+  applyFilters();
 }
 
 function render() {
@@ -547,6 +775,8 @@ function render() {
   renderNext();
   renderOld();
   renderSuppliers();
+  renderClaims();
+  updateSelectedCount();
 }
 
 function renderSummary() {
@@ -660,8 +890,26 @@ function renderSuppliers() {
   ]);
 }
 
+
+function renderClaims() {
+  const filters = getFilterValues();
+  const data = state.rows
+    .filter(r => rowMatchesFilters(r, filters, 'claim') && hasClaim(r))
+    .sort((a, b) => {
+      const ac = currentClaim(a);
+      const bc = currentClaim(b);
+      return String(bc?.updatedAt || '').localeCompare(String(ac?.updatedAt || ''));
+    });
+  const count = el('claimsCount');
+  if (count) count.textContent = `${data.length.toLocaleString('es-ES')} líneas reclamadas/en trámite`;
+  if (el('claimsTable')) renderTable('claimsTable', data, lotColumns());
+}
+
 function lotColumns() {
   return [
+    ['Sel.', r => claimCheckbox(r)],
+    ['Gestión', r => currentClaim(r) ? claimBadge(currentClaim(r).status) : claimBadge('Pendiente')],
+    ['Nota recl.', r => currentClaim(r) ? escapeHtml(currentClaim(r).note || '') : ''],
     ['Nº artículo', r => r.item], ['Descripción', r => r.desc], ['Grupo', r => r.group], ['Tipo', r => r.type], ['Frío', r => r.cold],
     ['Lote', r => r.lot], ['Almacén', r => r.warehouse], ['Stock', r => fmtNum(r.stock, 2), 'num'],
     ['Caducidad', r => fmtDate(r.exp)], ['Estado', r => badge(r.status, r.daysExp)], ['Política', r => policyBadge(r.policyStatus)], ['Días cad.', r => fmtNum(r.daysExp), 'num'],
@@ -692,6 +940,8 @@ function exportView() {
     'Fecha caducidad': fmtDate(r.exp),
     'Estado caducidad': r.status,
     'Política caducidad': r.policyStatus,
+    'Estado reclamación': currentClaim(r)?.status || '',
+    'Nota reclamación': currentClaim(r)?.note || '',
     'Stock': r.stock,
     'Fecha entrada real': fmtDate(r.entryDate),
     'Último cliente que compró artículo': r.lastArticleClient,
@@ -701,7 +951,7 @@ function exportView() {
 
   const ws = XLSX.utils.aoa_to_sheet([[title], []]);
   XLSX.utils.sheet_add_json(ws, data, { origin: 'A3' });
-  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 10 } }];
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 12 } }];
   ws['A1'].s = {
     font: { bold: true, sz: 16 },
     alignment: { horizontal: 'left', vertical: 'center' }
@@ -715,6 +965,8 @@ function exportView() {
     { wch: 12 }, // Fecha caducidad
     { wch: 18 }, // Estado caducidad
     { wch: 18 }, // Política caducidad
+    { wch: 18 }, // Estado reclamación
+    { wch: 28 }, // Nota reclamación
     { wch: 9 },  // Stock
     { wch: 12 }, // Fecha entrada real
     { wch: 24 }, // Último cliente
@@ -737,7 +989,7 @@ function exportView() {
     fitToHeight: 0,
     horizontalCentered: true
   };
-  ws['!autofilter'] = { ref: `A3:K${Math.max(3, data.length + 3)}` };
+  ws['!autofilter'] = { ref: `A3:M${Math.max(3, data.length + 3)}` };
   ws['!freeze'] = { xSplit: 0, ySplit: 3 };
 
   const wb = XLSX.utils.book_new();
@@ -757,6 +1009,7 @@ function activeFilterParts() {
   const expiry = el('expiryFilter').value;
   const supplier = el('supplierFilter').value;
   const policy = el('policyFilter').value;
+  const claim = el('claimFilter').value;
   const type = el('typeFilter').value;
   const cold = el('coldFilter').value;
   const wh = el('warehouseFilter').value;
@@ -766,6 +1019,9 @@ function activeFilterParts() {
   else if (expiry !== 'all') parts.push(`caducidad ${expiry} mes${expiry === '1' ? '' : 'es'} completo${expiry === '1' ? '' : 's'}`);
   if (supplier !== 'all') parts.push(supplier);
   if (policy !== 'all') parts.push(policy);
+  if (claim === 'pending') parts.push('pendientes');
+  else if (claim === 'claimed') parts.push('reclamados');
+  else if (claim === 'all') parts.push('todos gestion');
   if (type !== 'all') parts.push(type);
   if (cold !== 'all') parts.push(normKey(cold) === 'si' ? 'frio' : 'no frio');
   if (wh !== 'all') parts.push(`almacen ${wh}`);

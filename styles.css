@@ -127,3 +127,82 @@ tr:hover td { background: #fbfdff; }
   .cards { grid-template-columns: 1fr 1fr; }
   .bar-row { grid-template-columns: 110px 1fr 48px; }
 }
+
+/* Reclamaciones locales v3.0 */
+.claims-panel {
+  background: rgba(255,255,255,.92);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin: 0 0 14px;
+}
+.claims-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.claims-panel h2 { margin: 0 0 4px; font-size: 19px; }
+.claims-panel p { margin: 0; color: var(--muted); font-weight: 600; }
+#selectedCount { color: var(--blue-dark); white-space: nowrap; }
+.claims-actions {
+  display: grid;
+  grid-template-columns: 170px minmax(260px, 1fr) repeat(4, auto);
+  gap: 10px;
+  align-items: end;
+}
+.claims-actions label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.claims-actions select,
+.claims-actions input[type="text"] {
+  margin-top: 6px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  color: var(--ink);
+  padding: 12px 13px;
+  outline: none;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.claims-actions input[type="text"]:focus,
+.claims-actions select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(23,103,194,.12);
+}
+button.danger {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-weight: 800;
+  background: #fee4e2;
+  color: var(--red);
+}
+button.danger:disabled,
+button.ghost:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.claim-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
+}
+@media (max-width: 1100px) {
+  .claims-actions { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 700px) {
+  .claims-panel__header { display: block; }
+  #selectedCount { display: block; margin-top: 8px; }
+  .claims-actions { grid-template-columns: 1fr; }
+}
