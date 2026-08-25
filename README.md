@@ -1,16 +1,18 @@
-# Caducados PROVESA v2.9
+# Caducados PROVESA v2.10
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Novedades v2.9
+## Novedades v2.10
 
 - Las políticas de caducidad ya no se cargan manualmente desde la app.
 - Las políticas solo se cambian sustituyendo en GitHub el archivo `assets/politicas-caducidad-proveedores.xlsx`.
 - Eliminada la línea de estado al cargar el Excel de SAP.
 - Eliminadas las tarjetas resumen superiores.
-- El filtro de caducidad pasa de días a meses.
-- El filtro mensual incluye todo lo caducado y todos los productos que caduquen hasta fin del mes calculado.
-- Ejemplo: si la fecha actual es 25/08/2026 y se filtra por 6 meses, se incluyen productos hasta el 31/03/2027.
+- Ajustado el filtro de caducidad:
+  - **Caducados actuales** muestra todos los artículos con fecha de caducidad anterior a la fecha actual.
+  - Los filtros por meses trabajan por meses naturales completos.
+  - Ejemplo: si hoy es 15/01 y se filtra 1 mes, se muestran caducidades desde 01/01 hasta 28/02 o 29/02 si es bisiesto.
+  - El cálculo se hace con la fecha actual de la app, no con los días calculados en SAP el día que se exportó el Excel.
 
 ## Lógica de política
 

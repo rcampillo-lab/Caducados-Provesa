@@ -116,23 +116,41 @@ function daysFrom(date) {
   return Math.round((today - d) / 86400000);
 }
 
+function todayDateOnly() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function currentMonthStartDate() {
+  const today = todayDateOnly();
+  return new Date(today.getFullYear(), today.getMonth(), 1);
+}
+
 function expiryLimitDate(months) {
   const n = Number(months);
   if (!Number.isFinite(n)) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  // Criterio PROVESA: meses naturales cerrados.
-  // Ejemplo: 25/08/2026 + filtro 6 meses => 31/03/2027.
-  return new Date(today.getFullYear(), today.getMonth() + n + 2, 0);
+  const today = todayDateOnly();
+  // Criterio PROVESA v2.10: meses naturales completos.
+  // Ejemplo: si hoy es 15/01 y filtro 1 mes, se filtra desde 01/01 hasta 28/02 o 29/02.
+  return new Date(today.getFullYear(), today.getMonth() + n + 1, 0);
+}
+
+function isCurrentlyExpired(row) {
+  const exp = parseDate(row.exp);
+  if (!exp) return false;
+  exp.setHours(0, 0, 0, 0);
+  return exp < todayDateOnly();
 }
 
 function expiresWithinMonths(row, months) {
   const exp = parseDate(row.exp);
+  const start = currentMonthStartDate();
   const limit = expiryLimitDate(months);
-  if (!exp || !limit) return false;
+  if (!exp || !start || !limit) return false;
   exp.setHours(0, 0, 0, 0);
   limit.setHours(0, 0, 0, 0);
-  return exp <= limit;
+  return exp >= start && exp <= limit;
 }
 
 function mapRow(row) {
@@ -141,7 +159,8 @@ function mapRow(row) {
   const daysExpRaw = get(row, COLS.daysExp);
   const daysLifeRaw = get(row, COLS.daysLife);
   const monthsLifeRaw = get(row, COLS.monthsLife);
-  const daysExp = daysExpRaw !== '' ? parseNumber(daysExpRaw) : diffDays(new Date(), exp);
+  const calculatedDaysExp = diffDays(new Date(), exp);
+  const daysExp = calculatedDaysExp !== null ? calculatedDaysExp : (daysExpRaw !== '' ? parseNumber(daysExpRaw) : null);
   const daysInProvesa = daysFrom(entry);
   const cold = norm(get(row, COLS.cold));
   return {
@@ -153,7 +172,7 @@ function mapRow(row) {
     lot: norm(get(row, COLS.lot)),
     exp,
     daysExp: Number.isFinite(daysExp) ? daysExp : null,
-    status: norm(get(row, COLS.status)) || statusFromDays(daysExp),
+    status: statusFromDays(daysExp) || norm(get(row, COLS.status)),
     warehouse: norm(get(row, COLS.warehouse)) || norm(get(row, COLS.entryWarehouse)),
     stock: parseNumber(get(row, COLS.stock)),
     entryDate: entry,
@@ -390,7 +409,7 @@ function applyFilters() {
   state.filtered = state.rows.filter(r => {
     const hay = normKey([r.item, r.desc, r.group, r.type, r.lot, r.warehouse, r.supplier, r.lastArticleClient, r.lastLotClient].join(' '));
     if (q && !hay.includes(q)) return false;
-    if (expiry === 'expired' && !(r.daysExp < 0)) return false;
+    if (expiry === 'expired' && !isCurrentlyExpired(r)) return false;
     if (!['all','expired'].includes(expiry) && !expiresWithinMonths(r, Number(expiry))) return false;
     if (supplier !== 'all' && r.supplier !== supplier) return false;
     if (policy !== 'all' && r.policyStatus !== policy) return false;
@@ -638,8 +657,8 @@ function activeFilterParts() {
   const wh = el('warehouseFilter').value;
 
   if (q) parts.push(`busqueda ${q}`);
-  if (expiry === 'expired') parts.push('caducados');
-  else if (expiry !== 'all') parts.push(`caduca ${expiry} meses`);
+  if (expiry === 'expired') parts.push('caducados actuales');
+  else if (expiry !== 'all') parts.push(`caducidad ${expiry} mes${expiry === '1' ? '' : 'es'} completo${expiry === '1' ? '' : 's'}`);
   if (supplier !== 'all') parts.push(supplier);
   if (policy !== 'all') parts.push(policy);
   if (type !== 'all') parts.push(type);
