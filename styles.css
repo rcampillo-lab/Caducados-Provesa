@@ -61,6 +61,16 @@ button { cursor: pointer; }
 button.secondary { background: rgba(255,255,255,.18); color: white; border: 1px solid rgba(255,255,255,.4); }
 button.secondary:disabled { opacity: .45; cursor: not-allowed; }
 button.ghost { background: var(--soft-blue); color: var(--blue-dark); }
+button.manage-btn {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-weight: 900;
+  background: var(--blue);
+  color: white;
+  box-shadow: 0 10px 24px rgba(23,103,194,.18);
+}
+button.manage-btn:hover { background: var(--blue-dark); }
 .status-card, .filters-panel, .panel {
   background: rgba(255,255,255,.92); border: 1px solid var(--line); box-shadow: var(--shadow);
   border-radius: var(--radius);
@@ -261,11 +271,16 @@ button.ghost:disabled {
   grid-template-columns: repeat(4, minmax(180px, 1fr));
   gap: 10px;
 }
+.exports-actions--with-manage {
+  grid-template-columns: minmax(180px, .9fr) repeat(4, minmax(180px, 1fr));
+}
 .exports-actions button { white-space: normal; text-align: center; }
 @media (max-width: 1100px) {
-  .exports-actions { grid-template-columns: repeat(2, 1fr); }
+  .exports-actions,
+  .exports-actions--with-manage { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
   .exports-panel__header { display: block; }
-  .exports-actions { grid-template-columns: 1fr; }
+  .exports-actions,
+  .exports-actions--with-manage { grid-template-columns: 1fr; }
 }

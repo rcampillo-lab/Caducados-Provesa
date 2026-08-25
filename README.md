@@ -1,4 +1,4 @@
-# Caducados PROVESA v3.7
+# Caducados PROVESA v3.8
 
 App estática tipo **Other** para Vercel/GitHub.
 
@@ -125,3 +125,9 @@ Sin build command, sin `package.json` y sin `vercel.json`.
 
 ## v3.7
 - La exportación de ofertas de compañía fuera de política se ordena por fecha de caducidad ascendente, dejando arriba los productos que caducan antes.
+
+
+## v3.8
+- Se intercambia la posición de los bloques: **Exportaciones de gestión** queda antes de **Gestión de reclamaciones**.
+- Se añade el botón **Gestionar** dentro de **Exportaciones de gestión** como primer paso para el futuro flujo guiado.
+- El botón queda preparado visualmente; la lógica completa del recorrido guiado se definirá en la siguiente fase.

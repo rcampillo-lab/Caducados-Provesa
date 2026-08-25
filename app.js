@@ -521,6 +521,8 @@ function setup() {
   if (exportPetOutPolicyBtn) exportPetOutPolicyBtn.addEventListener('click', exportPetOutPolicyOffers);
   const exportProductionOutPolicyBtn = el('exportProductionOutPolicyBtn');
   if (exportProductionOutPolicyBtn) exportProductionOutPolicyBtn.addEventListener('click', exportProductionOutPolicy);
+  const manageFlowBtn = el('manageFlowBtn');
+  if (manageFlowBtn) manageFlowBtn.addEventListener('click', startManagementFlow);
   el('claimSelectedBtn').addEventListener('click', markSelectedClaims);
   el('unclaimSelectedBtn').addEventListener('click', unclaimSelected);
   el('exportClaimsBtn').addEventListener('click', exportClaims);
@@ -1042,6 +1044,10 @@ function renderTable(id, data, cols) {
   `;
 }
 
+
+function startManagementFlow() {
+  alert('Botón Gestionar preparado. En el siguiente paso definiremos el recorrido guiado: almacén 01, caducados en política por proveedor, caducados fuera de política, próximos fuera de política y después almacén 02.');
+}
 
 function updateGestionExportButtons() {
   ['exportExpiredOutPolicyBtn','exportExpiredInPolicyBtn','exportPetOutPolicyBtn','exportProductionOutPolicyBtn'].forEach(id => {
