@@ -396,35 +396,140 @@ function clearFilters() {
   applyFilters();
 }
 
-function applyFilters() {
-  const q = normKey(el('searchInput').value);
-  const expiry = el('expiryFilter').value;
-  const supplier = el('supplierFilter').value;
-  const policy = el('policyFilter').value;
-  const type = el('typeFilter').value;
-  const cold = el('coldFilter').value;
-  const wh = el('warehouseFilter').value;
-  const sort = el('sortFilter').value;
+function getFilterValues() {
+  return {
+    q: normKey(el('searchInput').value),
+    expiry: el('expiryFilter').value,
+    supplier: el('supplierFilter').value,
+    policy: el('policyFilter').value,
+    type: el('typeFilter').value,
+    cold: el('coldFilter').value,
+    wh: el('warehouseFilter').value,
+    sort: el('sortFilter').value,
+  };
+}
 
-  state.filtered = state.rows.filter(r => {
-    const hay = normKey([r.item, r.desc, r.group, r.type, r.lot, r.warehouse, r.supplier, r.lastArticleClient, r.lastLotClient].join(' '));
-    if (q && !hay.includes(q)) return false;
-    if (expiry === 'expired' && !isCurrentlyExpired(r)) return false;
-    if (!['all','expired'].includes(expiry) && !expiresWithinMonths(r, Number(expiry))) return false;
-    if (supplier !== 'all' && r.supplier !== supplier) return false;
-    if (policy !== 'all' && r.policyStatus !== policy) return false;
-    if (type !== 'all' && r.type !== type) return false;
-    if (cold !== 'all' && normKey(r.cold) !== cold) return false;
-    if (wh !== 'all' && r.warehouse !== wh) return false;
-    return true;
-  });
+function coldFilterKey(value) {
+  return isCold(value) ? 'si' : 'no';
+}
+
+function rowMatchesFilters(r, filters, exclude = '') {
+  const hay = normKey([r.item, r.desc, r.group, r.type, r.lot, r.warehouse, r.supplier, r.lastArticleClient, r.lastLotClient].join(' '));
+
+  if (exclude !== 'search' && filters.q && !hay.includes(filters.q)) return false;
+
+  if (exclude !== 'expiry') {
+    if (filters.expiry === 'expired' && !isCurrentlyExpired(r)) return false;
+    if (!['all','expired'].includes(filters.expiry) && !expiresWithinMonths(r, Number(filters.expiry))) return false;
+  }
+
+  if (exclude !== 'supplier' && filters.supplier !== 'all' && r.supplier !== filters.supplier) return false;
+  if (exclude !== 'policy' && filters.policy !== 'all' && r.policyStatus !== filters.policy) return false;
+  if (exclude !== 'type' && filters.type !== 'all' && r.type !== filters.type) return false;
+  if (exclude !== 'cold' && filters.cold !== 'all' && coldFilterKey(r.cold) !== filters.cold) return false;
+  if (exclude !== 'warehouse' && filters.wh !== 'all' && r.warehouse !== filters.wh) return false;
+
+  return true;
+}
+
+function optionRowsFor(exclude, filters) {
+  return state.rows.filter(r => rowMatchesFilters(r, filters, exclude));
+}
+
+function resetSelectOptions(select, firstLabel, options, currentValue) {
+  const optionValues = options.map(o => o.value);
+  const keepCurrent = currentValue === 'all' || optionValues.includes(currentValue);
+
+  select.innerHTML = `<option value="all">${escapeHtml(firstLabel)}</option>` +
+    options.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('');
+
+  select.value = keepCurrent ? currentValue : 'all';
+  return !keepCurrent;
+}
+
+function uniqueOptions(rows, getter, labelGetter = getter) {
+  const map = new Map();
+  for (const r of rows) {
+    const value = getter(r);
+    if (!value) continue;
+    const label = labelGetter(r);
+    if (!map.has(value)) map.set(value, { value, label, count: 0 });
+    map.get(value).count += 1;
+  }
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'es'));
+}
+
+function syncDynamicFilterOptions() {
+  if (!state.rows.length) return false;
+
+  const filters = getFilterValues();
+  let changed = false;
+
+  const supplierRows = optionRowsFor('supplier', filters);
+  changed = resetSelectOptions(
+    el('supplierFilter'),
+    'Todos',
+    uniqueOptions(supplierRows, r => r.supplier),
+    filters.supplier
+  ) || changed;
+
+  const policyOrder = ['En política', 'Fuera de política', 'No acepta devolución', 'Sin fecha entrada', 'Sin política definida'];
+  const policyRows = optionRowsFor('policy', filters);
+  const policyCounts = new Map();
+  for (const r of policyRows) {
+    const value = r.policyStatus || 'Sin política definida';
+    policyCounts.set(value, (policyCounts.get(value) || 0) + 1);
+  }
+  const policyOptions = policyOrder
+    .filter(value => policyCounts.has(value))
+    .map(value => ({ value, label: value, count: policyCounts.get(value) }));
+  changed = resetSelectOptions(el('policyFilter'), 'Todas', policyOptions, filters.policy) || changed;
+
+  const typeRows = optionRowsFor('type', filters);
+  changed = resetSelectOptions(
+    el('typeFilter'),
+    'Todos',
+    uniqueOptions(typeRows, r => r.type),
+    filters.type
+  ) || changed;
+
+  const coldRows = optionRowsFor('cold', filters);
+  const coldCounts = new Map();
+  for (const r of coldRows) {
+    const value = coldFilterKey(r.cold);
+    coldCounts.set(value, (coldCounts.get(value) || 0) + 1);
+  }
+  const coldOptions = [
+    { value: 'si', label: 'Sí' },
+    { value: 'no', label: 'No' },
+  ].filter(o => coldCounts.has(o.value)).map(o => ({ ...o, count: coldCounts.get(o.value) }));
+  changed = resetSelectOptions(el('coldFilter'), 'Todos', coldOptions, filters.cold) || changed;
+
+  const warehouseRows = optionRowsFor('warehouse', filters);
+  changed = resetSelectOptions(
+    el('warehouseFilter'),
+    'Todos',
+    uniqueOptions(warehouseRows, r => r.warehouse, r => `Almacén ${r.warehouse}`),
+    filters.wh
+  ) || changed;
+
+  return changed;
+}
+
+function applyFilters() {
+  let safety = 0;
+  while (syncDynamicFilterOptions() && safety < 5) safety += 1;
+
+  const filters = getFilterValues();
+  state.filtered = state.rows.filter(r => rowMatchesFilters(r, filters));
 
   state.filtered.sort((a,b) => {
-    if (sort === 'age') return (b.daysInProvesa ?? -999999) - (a.daysInProvesa ?? -999999);
-    if (sort === 'stock') return b.stock - a.stock;
-    if (sort === 'item') return a.item.localeCompare(b.item, 'es') || a.lot.localeCompare(b.lot, 'es');
+    if (filters.sort === 'age') return (b.daysInProvesa ?? -999999) - (a.daysInProvesa ?? -999999);
+    if (filters.sort === 'stock') return b.stock - a.stock;
+    if (filters.sort === 'item') return a.item.localeCompare(b.item, 'es') || a.lot.localeCompare(b.lot, 'es');
     return (a.daysExp ?? 999999) - (b.daysExp ?? 999999);
   });
+
   render();
 }
 
