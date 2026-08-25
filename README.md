@@ -1,4 +1,4 @@
-# Caducados PROVESA v3.8
+# Caducados PROVESA v3.10
 
 App estática tipo **Other** para Vercel/GitHub.
 
@@ -144,3 +144,8 @@ Sin build command, sin `package.json` y sin `vercel.json`.
 - Al terminar el almacén 01, el botón cambia a **Pasar a almacén 2** y repite el mismo recorrido.
 - Al terminar el almacén 02, el botón cambia a **Finalizar gestión**.
 - En cada paso se muestra el bloque activo, el almacén, proveedor si aplica, número de líneas pendientes y exportación recomendada.
+
+## v3.10
+- La exportación **Ofertas compañía fuera política** inserta una fila en blanco entre meses de caducidad, manteniendo arriba lo que caduca antes.
+- Política actualizada para **MERCK SHARP & DOHME ANIMAL HEALTH, S.L.**: 272 días para artículos no fríos y 181 días para artículos de frío.
+

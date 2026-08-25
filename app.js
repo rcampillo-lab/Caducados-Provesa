@@ -1522,7 +1522,7 @@ function exportPetOutPolicyOffers() {
     return;
   }
 
-  const data = groupRows(
+  const sortedRows = groupRows(
     rows,
     r => [r.item, r.desc, r.lot, toIsoDate(r.exp)].join('|'),
     r => ({
@@ -1539,7 +1539,20 @@ function exportPetOutPolicyOffers() {
     String(a['_sortCaducidad'] || '9999-12-31').localeCompare(String(b['_sortCaducidad'] || '9999-12-31')) ||
     String(a['Nº artículo']).localeCompare(String(b['Nº artículo']), 'es') ||
     String(a['Lote']).localeCompare(String(b['Lote']), 'es')
-  ).map(({ _sortCaducidad, ...row }) => row);
+  );
+
+  const columns = ['Nº artículo', 'Descripción', 'Cantidad', 'Lote', 'Fecha de caducidad', 'Descuento'];
+  const blankRow = Object.fromEntries(columns.map(col => [col, '']));
+  const data = [];
+  let previousMonth = '';
+
+  for (const row of sortedRows) {
+    const monthKey = String(row['_sortCaducidad'] || '').slice(0, 7);
+    if (previousMonth && monthKey && monthKey !== previousMonth) data.push({ ...blankRow });
+    const { _sortCaducidad, ...visibleRow } = row;
+    data.push(visibleRow);
+    if (monthKey) previousMonth = monthKey;
+  }
 
   writeGestionWorkbook(
     `ofertas_compania_fuera_politica_almacen_${el('warehouseFilter').value}`,
