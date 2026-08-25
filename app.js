@@ -13,6 +13,7 @@ const state = {
   claims: {},
   selectedClaimIds: new Set(),
   expandedClaimIds: new Set(),
+  manageFlow: { active: false, warehouseIndex: 0, stepIndex: 0, providers: [], providerIndex: 0 },
 };
 
 const COLS = {
@@ -41,6 +42,56 @@ const COLS = {
   lastLotSaleDate: ['Fecha último albarán lote', 'Fecha ultimo albaran lote'],
   lastLotClient: ['Último cliente que compró lote', 'Ultimo cliente que compro lote'],
   lastLotSaleDoc: ['Nº último albarán lote', 'No último albarán lote', 'Nº ultimo albaran lote'],
+};
+
+
+const MANAGEMENT_WAREHOUSE_TARGETS = ['01', '02'];
+const MANAGEMENT_STEP_ORDER = ['expiredOutPolicy', 'expiredInPolicy', 'petOutPolicy', 'productionOutPolicy'];
+const MANAGEMENT_STEPS = {
+  expiredOutPolicy: {
+    title: 'Caducados fuera de política',
+    expiry: 'expired',
+    policy: 'Fuera de política',
+    supplier: 'all',
+    typeKind: 'all',
+    targetStatus: 'En trámite',
+    note: 'Flujo Gestionar: caducado fuera de política - destrucción',
+    exportLabel: 'Caducados fuera política',
+    detail: 'Revisa los caducados fuera de política. Exporta su Excel y después pulsa Siguiente para marcarlos como En trámite.',
+  },
+  expiredInPolicy: {
+    title: 'Caducados en política',
+    expiry: 'expired',
+    policy: 'En política',
+    supplier: 'provider',
+    typeKind: 'all',
+    targetStatus: 'En trámite',
+    note: 'Flujo Gestionar: caducado en política - tramitar devolución proveedor',
+    exportLabel: 'Caducados en política por proveedor',
+    detail: 'Se gestionan por proveedor. Exporta el Excel del proveedor mostrado y pulsa Siguiente para pasar al siguiente proveedor.',
+  },
+  petOutPolicy: {
+    title: 'Próximos 6 meses · Compañía fuera de política',
+    expiry: '6',
+    policy: 'Fuera de política',
+    supplier: 'all',
+    typeKind: 'pet',
+    targetStatus: 'En oferta',
+    note: 'Flujo Gestionar: oferta compañía fuera de política',
+    exportLabel: 'Ofertas compañía fuera política',
+    detail: 'Exporta el listado de compañía fuera de política para rellenar descuentos manualmente. Después pulsa Siguiente.',
+  },
+  productionOutPolicy: {
+    title: 'Próximos 6 meses · Producción fuera de política',
+    expiry: '6',
+    policy: 'Fuera de política',
+    supplier: 'all',
+    typeKind: 'production',
+    targetStatus: 'En trámite',
+    note: 'Flujo Gestionar: producción fuera de política - revisar acción',
+    exportLabel: 'Producción fuera política',
+    detail: 'Exporta el listado de producción fuera de política, revisa las acciones y después avanza de almacén o finaliza.',
+  },
 };
 
 const el = (id) => document.getElementById(id);
@@ -642,6 +693,7 @@ async function onFile(e) {
   const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  state.manageFlow.active = false;
   state.raw = rows;
   state.dataFileName = file.name;
   state.rows = rows.map(mapRow).filter(r => r.item || r.desc || r.lot).map(assignClaimId);
@@ -681,6 +733,8 @@ function populateWarehouses() {
 }
 
 function clearFilters() {
+  state.manageFlow.active = false;
+  updateManagementFlowUi();
   el('searchInput').value = '';
   el('expiryFilter').value = 'all';
   el('supplierFilter').value = 'all';
@@ -859,6 +913,7 @@ function applyFilters() {
   });
 
   render();
+  updateManagementFlowUi();
 }
 
 function setTab(tab) {
@@ -1046,7 +1101,234 @@ function renderTable(id, data, cols) {
 
 
 function startManagementFlow() {
-  alert('Botón Gestionar preparado. En el siguiente paso definiremos el recorrido guiado: almacén 01, caducados en política por proveedor, caducados fuera de política, próximos fuera de política y después almacén 02.');
+  if (!state.rows.length) {
+    alert('Carga primero el Excel de SAP.');
+    return;
+  }
+
+  if (!state.manageFlow.active) {
+    state.manageFlow = {
+      active: true,
+      warehouseIndex: 0,
+      stepIndex: 0,
+      providers: [],
+      providerIndex: 0,
+    };
+    applyCurrentManagementStep();
+    return;
+  }
+
+  advanceManagementFlow();
+}
+
+function currentManagementStepKey() {
+  return MANAGEMENT_STEP_ORDER[state.manageFlow.stepIndex] || '';
+}
+
+function currentManagementStep() {
+  return MANAGEMENT_STEPS[currentManagementStepKey()] || null;
+}
+
+function currentManagementWarehouse() {
+  const target = MANAGEMENT_WAREHOUSE_TARGETS[state.manageFlow.warehouseIndex] || MANAGEMENT_WAREHOUSE_TARGETS[0];
+  return resolveWarehouseValue(target);
+}
+
+function resolveWarehouseValue(target) {
+  const values = [...new Set(state.rows.map(r => r.warehouse).filter(Boolean))];
+  const candidates = target === '01' ? ['01', '1', '001'] : ['02', '2', '002'];
+  return candidates.find(v => values.includes(v)) || target;
+}
+
+function resolveTypeValue(kind) {
+  if (kind === 'all') return 'all';
+  const values = [...new Set(state.rows.map(r => r.type).filter(Boolean))];
+  if (kind === 'pet') {
+    return values.find(v => normKey(v) === 'compania') || values.find(v => normKey(v).includes('compania')) || 'all';
+  }
+  if (kind === 'production') {
+    return values.find(v => normKey(v) === 'produccion') || values.find(v => normKey(v).includes('produccion')) || 'all';
+  }
+  return 'all';
+}
+
+function ensureSelectOption(selectId, value, label = value) {
+  const select = el(selectId);
+  if (!select) return;
+  const exists = [...select.options].some(opt => opt.value === value);
+  if (!exists) select.appendChild(new Option(label, value));
+  select.value = value;
+}
+
+function pendingExpiredInPolicyProviders(warehouse) {
+  return [...new Set(state.rows
+    .filter(row =>
+      row.warehouse === warehouse &&
+      isCurrentlyExpired(row) &&
+      isInPolicy(row) &&
+      gestionStatus(row) === 'Pendiente' &&
+      row.supplier
+    )
+    .map(row => row.supplier))]
+    .sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+function applyCurrentManagementStep() {
+  const stepKey = currentManagementStepKey();
+  const step = currentManagementStep();
+  if (!step) {
+    finishManagementFlow();
+    return;
+  }
+
+  const warehouse = currentManagementWarehouse();
+
+  if (stepKey === 'expiredInPolicy') {
+    if (!state.manageFlow.providers.length) {
+      state.manageFlow.providers = pendingExpiredInPolicyProviders(warehouse);
+      state.manageFlow.providerIndex = 0;
+    }
+    if (!state.manageFlow.providers.length) {
+      // Si no hay proveedores pendientes en política, pasamos automáticamente al siguiente bloque.
+      state.manageFlow.stepIndex += 1;
+      state.manageFlow.providers = [];
+      state.manageFlow.providerIndex = 0;
+      applyCurrentManagementStep();
+      return;
+    }
+  }
+
+  const supplier = step.supplier === 'provider'
+    ? (state.manageFlow.providers[state.manageFlow.providerIndex] || 'all')
+    : 'all';
+  const typeValue = resolveTypeValue(step.typeKind);
+
+  el('searchInput').value = '';
+  ensureSelectOption('expiryFilter', step.expiry, step.expiry);
+  ensureSelectOption('policyFilter', step.policy, step.policy);
+  ensureSelectOption('supplierFilter', supplier, supplier === 'all' ? 'Todos' : supplier);
+  ensureSelectOption('claimFilter', 'pending', 'Pendientes');
+  ensureSelectOption('typeFilter', typeValue, typeValue === 'all' ? 'Todos' : typeValue);
+  ensureSelectOption('coldFilter', 'all', 'Todos');
+  ensureSelectOption('warehouseFilter', warehouse, `Almacén ${warehouse}`);
+  ensureSelectOption('sortFilter', 'expiry', 'Caducidad próxima');
+
+  state.selectedClaimIds.clear();
+  setTab('lotes');
+  applyFilters();
+}
+
+function advanceManagementFlow() {
+  autoMarkCurrentManagementStep();
+
+  const stepKey = currentManagementStepKey();
+
+  if (stepKey === 'expiredInPolicy') {
+    const nextProviderIndex = state.manageFlow.providerIndex + 1;
+    if (nextProviderIndex < state.manageFlow.providers.length) {
+      state.manageFlow.providerIndex = nextProviderIndex;
+      applyCurrentManagementStep();
+      return;
+    }
+  }
+
+  state.manageFlow.stepIndex += 1;
+  state.manageFlow.providers = [];
+  state.manageFlow.providerIndex = 0;
+
+  if (state.manageFlow.stepIndex >= MANAGEMENT_STEP_ORDER.length) {
+    if (state.manageFlow.warehouseIndex < MANAGEMENT_WAREHOUSE_TARGETS.length - 1) {
+      state.manageFlow.warehouseIndex += 1;
+      state.manageFlow.stepIndex = 0;
+      applyCurrentManagementStep();
+      return;
+    }
+    finishManagementFlow();
+    return;
+  }
+
+  applyCurrentManagementStep();
+}
+
+function autoMarkCurrentManagementStep() {
+  const step = currentManagementStep();
+  if (!step) return;
+
+  const rows = state.filtered.filter(row => gestionStatus(row) === 'Pendiente');
+  if (!rows.length) return;
+
+  const now = new Date().toISOString();
+  for (const row of rows) {
+    state.claims[row.claimId] = {
+      id: row.claimId,
+      status: step.targetStatus,
+      note: step.note,
+      updatedAt: now,
+      item: row.item,
+      desc: row.desc,
+      lot: row.lot,
+      warehouse: row.warehouse,
+      exp: toIsoDate(row.exp),
+      supplier: row.supplier,
+      entryDoc: row.entryDoc,
+      stock: row.stock,
+      managedByFlow: true,
+    };
+  }
+
+  saveClaims();
+  applyClaimsToRows();
+  state.selectedClaimIds.clear();
+}
+
+function finishManagementFlow() {
+  state.manageFlow = { active: false, warehouseIndex: 0, stepIndex: 0, providers: [], providerIndex: 0 };
+  updateManagementFlowUi();
+  applyFilters();
+  alert('Gestión guiada finalizada. Se han recorrido almacén 01 y almacén 02.');
+}
+
+function updateManagementFlowUi() {
+  const button = el('manageFlowBtn');
+  const box = el('manageFlowStatus');
+  const title = el('manageFlowTitle');
+  const text = el('manageFlowText');
+
+  if (!button) return;
+
+  if (!state.manageFlow.active) {
+    button.dataset.active = 'false';
+    button.textContent = 'Gestionar';
+    button.title = 'Iniciar recorrido guiado de gestión';
+    if (box) box.hidden = true;
+    return;
+  }
+
+  button.dataset.active = 'true';
+
+  const stepKey = currentManagementStepKey();
+  const step = currentManagementStep();
+  const warehouse = currentManagementWarehouse();
+  const supplier = stepKey === 'expiredInPolicy'
+    ? (state.manageFlow.providers[state.manageFlow.providerIndex] || '')
+    : '';
+  const count = state.filtered.length;
+  const providerPosition = stepKey === 'expiredInPolicy'
+    ? ` · Proveedor ${state.manageFlow.providerIndex + 1} de ${state.manageFlow.providers.length}`
+    : '';
+
+  const isLastStep = state.manageFlow.stepIndex === MANAGEMENT_STEP_ORDER.length - 1;
+  const isWarehouseOne = state.manageFlow.warehouseIndex === 0;
+
+  if (isLastStep && isWarehouseOne) button.textContent = 'Pasar a almacén 2';
+  else if (isLastStep && !isWarehouseOne) button.textContent = 'Finalizar gestión';
+  else button.textContent = 'Siguiente';
+
+  if (box && title && text && step) {
+    box.hidden = false;
+    title.textContent = `Almacén ${warehouse} · ${step.title}${supplier ? ' · ' + supplier : ''}`;
+    text.innerHTML = `${escapeHtml(step.detail)}<br><strong>${count.toLocaleString('es-ES')}</strong> línea${count === 1 ? '' : 's'} pendiente${count === 1 ? '' : 's'} en este paso${providerPosition}. Exportación recomendada: <strong>${escapeHtml(step.exportLabel)}</strong>. Al pulsar <strong>${escapeHtml(button.textContent)}</strong>, las líneas pendientes visibles pasarán a <strong>${escapeHtml(step.targetStatus)}</strong>.`;
+  }
 }
 
 function updateGestionExportButtons() {

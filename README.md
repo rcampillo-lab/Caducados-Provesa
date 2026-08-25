@@ -131,3 +131,16 @@ Sin build command, sin `package.json` y sin `vercel.json`.
 - Se intercambia la posición de los bloques: **Exportaciones de gestión** queda antes de **Gestión de reclamaciones**.
 - Se añade el botón **Gestionar** dentro de **Exportaciones de gestión** como primer paso para el futuro flujo guiado.
 - El botón queda preparado visualmente; la lógica completa del recorrido guiado se definirá en la siguiente fase.
+
+## v3.9
+- Se activa el botón **Gestionar** con recorrido guiado.
+- El primer clic inicia el flujo en **Almacén 01**.
+- Cada clic en **Siguiente** marca las líneas pendientes visibles con el estado del paso antes de avanzar.
+- Recorrido por cada almacén:
+  1. Caducados actuales fuera de política → estado **En trámite**, nota de destrucción.
+  2. Caducados actuales en política → por proveedor, estado **En trámite**, nota de devolución proveedor.
+  3. Próximos 6 meses completos, fuera de política, compañía → estado **En oferta**.
+  4. Próximos 6 meses completos, fuera de política, producción → estado **En trámite**.
+- Al terminar el almacén 01, el botón cambia a **Pasar a almacén 2** y repite el mismo recorrido.
+- Al terminar el almacén 02, el botón cambia a **Finalizar gestión**.
+- En cada paso se muestra el bloque activo, el almacén, proveedor si aplica, número de líneas pendientes y exportación recomendada.

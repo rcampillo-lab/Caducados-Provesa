@@ -284,3 +284,26 @@ button.ghost:disabled {
   .exports-actions,
   .exports-actions--with-manage { grid-template-columns: 1fr; }
 }
+
+/* Gestión guiada v3.9 */
+.manage-flow-status {
+  margin-top: 12px;
+  border: 1px solid #b7d4f6;
+  background: #f1f7ff;
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.manage-flow-status strong:first-child {
+  display: block;
+  color: var(--blue-dark);
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+.manage-flow-status span strong {
+  color: var(--ink);
+}
+button.manage-btn[data-active="true"] {
+  background: var(--green);
+}
