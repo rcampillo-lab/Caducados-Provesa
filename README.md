@@ -1,8 +1,8 @@
-# Caducados PROVESA v3.1
+# Caducados PROVESA v3.3
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Novedades v3.1
+## Novedades v3.3
 
 - Se simplifican las secciones visibles a:
   - Resumen
@@ -109,3 +109,10 @@ Después hacer redeploy en Vercel o esperar a que Vercel despliegue automáticam
 Framework Preset: **Other**
 
 Sin build command, sin `package.json` y sin `vercel.json`.
+
+
+## Cambios v3.3
+
+- Añadido un checkbox en la cabecera de la tabla de Lotes.
+- El checkbox de cabecera selecciona o deselecciona todas las líneas visibles con los filtros activos.
+- Se mantiene la lógica anterior de filtros estables y detalle desplegable.

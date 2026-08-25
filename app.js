@@ -235,6 +235,30 @@ function selectedRows() {
   return [...state.selectedClaimIds].map(id => map.get(id)).filter(Boolean);
 }
 
+function visibleRowsForBulkSelection() {
+  return state.filtered.filter(row => row && row.claimId);
+}
+
+function updateSelectAllState() {
+  const box = document.getElementById('selectAllClaims');
+  if (!box) return;
+  const rows = visibleRowsForBulkSelection();
+  const total = rows.length;
+  const selectedVisible = rows.filter(row => state.selectedClaimIds.has(row.claimId)).length;
+  box.disabled = total === 0;
+  box.checked = total > 0 && selectedVisible === total;
+  box.indeterminate = selectedVisible > 0 && selectedVisible < total;
+  box.title = box.checked ? 'Desmarcar todas las líneas visibles' : 'Marcar todas las líneas visibles';
+}
+
+function toggleAllVisibleClaims(checked) {
+  for (const row of visibleRowsForBulkSelection()) {
+    if (checked) state.selectedClaimIds.add(row.claimId);
+    else state.selectedClaimIds.delete(row.claimId);
+  }
+  updateSelectedCount();
+}
+
 function updateSelectedCount() {
   const count = selectedRows().length;
   const selected = el('selectedCount');
@@ -243,11 +267,19 @@ function updateSelectedCount() {
   const unclaimBtn = el('unclaimSelectedBtn');
   if (claimBtn) claimBtn.disabled = count === 0;
   if (unclaimBtn) unclaimBtn.disabled = count === 0;
+  updateSelectAllState();
 }
 
 function onDocumentChange(event) {
   const target = event.target;
-  if (!target.classList || !target.classList.contains('claim-checkbox')) return;
+  if (!target.classList) return;
+
+  if (target.classList.contains('select-all-checkbox')) {
+    toggleAllVisibleClaims(target.checked);
+    return;
+  }
+
+  if (!target.classList.contains('claim-checkbox')) return;
   const id = target.dataset.claimId;
   if (!id) return;
   if (target.checked) state.selectedClaimIds.add(id);
@@ -699,13 +731,22 @@ function optionRowsFor(exclude, filters) {
 
 function resetSelectOptions(select, firstLabel, options, currentValue) {
   const optionValues = options.map(o => o.value);
-  const keepCurrent = currentValue === 'all' || optionValues.includes(currentValue);
 
+  // v3.2: no reiniciar filtros al guardar una gestión.
+  // Si el valor elegido deja de tener resultados, se conserva como opción activa
+  // para que el usuario decida si quiere cambiarlo o limpiar filtros.
+  const preserved = [];
+  if (currentValue && currentValue !== 'all' && !optionValues.includes(currentValue)) {
+    const currentLabel = select.options[select.selectedIndex]?.textContent || currentValue;
+    preserved.push({ value: currentValue, label: `${currentLabel} · sin resultados` });
+  }
+
+  const finalOptions = [...preserved, ...options];
   select.innerHTML = `<option value="all">${escapeHtml(firstLabel)}</option>` +
-    options.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('');
+    finalOptions.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('');
 
-  select.value = keepCurrent ? currentValue : 'all';
-  return !keepCurrent;
+  select.value = currentValue || 'all';
+  return false;
 }
 
 function uniqueOptions(rows, getter, labelGetter = getter) {
@@ -907,9 +948,6 @@ function lotColumns() {
     ['Nota recl.', r => currentClaim(r) ? escapeHtml(currentClaim(r).note || '') : ''],
     ['Nº artículo', r => r.item],
     ['Descripción', r => r.desc],
-    ['Grupo', r => r.group],
-    ['Tipo', r => r.type],
-    ['Frío', r => r.cold],
     ['Lote', r => r.lot],
     ['Almacén', r => r.warehouse],
     ['Stock', r => fmtNum(r.stock, 2), 'num'],
@@ -921,6 +959,9 @@ function lotColumns() {
 
 function lotDetailFields(r) {
   return [
+    ['Grupo', r.group],
+    ['Tipo', r.type],
+    ['Frío', r.cold],
     ['Entrada', fmtDate(r.entryDate)],
     ['Nº entrada', r.entryDoc],
     ['Proveedor entrada', r.supplier],
@@ -959,6 +1000,13 @@ function renderLotDetails(row) {
   `;
 }
 
+function renderHeaderCell(label) {
+  if (label === 'Sel.') {
+    return `<th class="select-col"><input type="checkbox" id="selectAllClaims" class="select-all-checkbox" aria-label="Seleccionar todas las líneas visibles" title="Marcar todas las líneas visibles" /></th>`;
+  }
+  return `<th>${escapeHtml(label)}</th>`;
+}
+
 function renderExpandableTable(id, data, cols) {
   const table = el(id);
   if (!data.length) {
@@ -966,7 +1014,7 @@ function renderExpandableTable(id, data, cols) {
     return;
   }
   table.innerHTML = `
-    <thead><tr>${cols.map(([h]) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+    <thead><tr>${cols.map(([h]) => renderHeaderCell(h)).join('')}</tr></thead>
     <tbody>${data.map(row => {
       const rowId = row.claimId;
       const safeRowId = escapeHtml(rowId);
@@ -978,6 +1026,7 @@ function renderExpandableTable(id, data, cols) {
       return main + detail;
     }).join('')}</tbody>
   `;
+  updateSelectAllState();
 }
 
 function renderTable(id, data, cols) {
