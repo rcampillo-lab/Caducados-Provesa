@@ -116,6 +116,25 @@ function daysFrom(date) {
   return Math.round((today - d) / 86400000);
 }
 
+function expiryLimitDate(months) {
+  const n = Number(months);
+  if (!Number.isFinite(n)) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  // Criterio PROVESA: meses naturales cerrados.
+  // Ejemplo: 25/08/2026 + filtro 6 meses => 31/03/2027.
+  return new Date(today.getFullYear(), today.getMonth() + n + 2, 0);
+}
+
+function expiresWithinMonths(row, months) {
+  const exp = parseDate(row.exp);
+  const limit = expiryLimitDate(months);
+  if (!exp || !limit) return false;
+  exp.setHours(0, 0, 0, 0);
+  limit.setHours(0, 0, 0, 0);
+  return exp <= limit;
+}
+
 function mapRow(row) {
   const exp = get(row, COLS.exp);
   const entry = get(row, COLS.entryDate);
@@ -192,7 +211,6 @@ function policyBadge(status) {
 
 function setup() {
   el('fileInput').addEventListener('change', onFile);
-  el('policyInput').addEventListener('change', onPolicyFile);
   ['searchInput','expiryFilter','supplierFilter','policyFilter','typeFilter','coldFilter','warehouseFilter','sortFilter'].forEach(id => {
     el(id).addEventListener('input', applyFilters);
     el(id).addEventListener('change', applyFilters);
@@ -213,17 +231,8 @@ async function autoLoadDefaultPolicies() {
     const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
     loadPolicyWorkbook(wb, 'Políticas incluidas');
   } catch (err) {
-    // Si se abre la app en local con file://, el navegador puede bloquear fetch.
-    // En ese caso se puede cargar manualmente el Excel de políticas.
+    // Las políticas solo se modifican sustituyendo el Excel en GitHub/assets.
   }
-}
-
-async function onPolicyFile(e) {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  const buffer = await file.arrayBuffer();
-  const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
-  loadPolicyWorkbook(wb, file.name);
 }
 
 function loadPolicyWorkbook(wb, fileName) {
@@ -301,13 +310,16 @@ function calculatePolicy(row) {
 }
 
 function updateStatusCard() {
+  const card = el('statusCard');
+  if (!card) return;
+
   if (!state.rows.length) {
-    const policyText = state.policyLoaded ? `Políticas cargadas: ${escapeHtml(state.policyFileName)} (${state.policyRules.size} proveedores)` : 'Políticas no cargadas: se usará norma general de 365 días';
-    el('statusCard').innerHTML = `<strong>Sin datos cargados.</strong><span>Exporta el resultado de la query desde SAP y carga aquí el Excel.</span><span>${policyText}</span>`;
+    card.style.display = 'flex';
+    card.innerHTML = `<strong>Sin datos cargados.</strong><span>Exporta el resultado de la query desde SAP y carga aquí el Excel.</span>`;
     return;
   }
-  const policyText = state.policyLoaded ? `${state.policyRules.size} proveedores con política` : 'norma general 365 días';
-  el('statusCard').innerHTML = `<strong>${state.rows.length.toLocaleString('es-ES')} líneas cargadas.</strong><span>${escapeHtml(state.dataFileName || '')}</span><span>Políticas: ${escapeHtml(policyText)}</span>`;
+
+  card.style.display = 'none';
 }
 
 async function onFile(e) {
@@ -379,7 +391,7 @@ function applyFilters() {
     const hay = normKey([r.item, r.desc, r.group, r.type, r.lot, r.warehouse, r.supplier, r.lastArticleClient, r.lastLotClient].join(' '));
     if (q && !hay.includes(q)) return false;
     if (expiry === 'expired' && !(r.daysExp < 0)) return false;
-    if (!['all','expired'].includes(expiry) && !(r.daysExp !== null && r.daysExp <= Number(expiry))) return false;
+    if (!['all','expired'].includes(expiry) && !expiresWithinMonths(r, Number(expiry))) return false;
     if (supplier !== 'all' && r.supplier !== supplier) return false;
     if (policy !== 'all' && r.policyStatus !== policy) return false;
     if (type !== 'all' && r.type !== type) return false;
@@ -415,22 +427,8 @@ function render() {
 
 function renderSummary() {
   const rows = state.filtered;
-  const uniqueItems = new Set(rows.map(r => r.item)).size;
-  const uniqueLots = new Set(rows.map(r => `${r.item}__${r.lot}__${r.warehouse}`)).size;
-  const stock = rows.reduce((s,r) => s + r.stock, 0);
-  const expired = rows.filter(r => r.daysExp < 0).reduce((s,r) => s + r.stock, 0);
-  const soon90 = rows.filter(r => r.daysExp >= 0 && r.daysExp <= 90).reduce((s,r) => s + r.stock, 0);
-  const inPolicy = rows.filter(r => r.policyStatus === 'En política').reduce((s,r) => s + r.stock, 0);
-  const noReturn = rows.filter(r => r.policyStatus === 'No acepta devolución').reduce((s,r) => s + r.stock, 0);
-  el('cards').innerHTML = [
-    card('Artículos', fmtNum(uniqueItems), 'con stock filtrado'),
-    card('Lotes/almacén', fmtNum(uniqueLots), 'artículo + lote + almacén'),
-    card('Stock total', fmtNum(stock, 2), 'unidades'),
-    card('Caducado', fmtNum(expired, 2), 'unidades'),
-    card('≤ 90 días', fmtNum(soon90, 2), 'incluye caducados'),
-    card('En política', fmtNum(inPolicy, 2), 'unidades'),
-    card('Sin devolución', fmtNum(noReturn, 2), 'unidades'),
-  ].join('');
+  const cards = el('cards');
+  if (cards) cards.innerHTML = '';
   renderBars('expiryBars', groupExpiry(rows));
   renderBars('warehouseBars', groupByWarehouse(rows));
 }
@@ -641,7 +639,7 @@ function activeFilterParts() {
 
   if (q) parts.push(`busqueda ${q}`);
   if (expiry === 'expired') parts.push('caducados');
-  else if (expiry !== 'all') parts.push(`caduca ${expiry} dias`);
+  else if (expiry !== 'all') parts.push(`caduca ${expiry} meses`);
   if (supplier !== 'all') parts.push(supplier);
   if (policy !== 'all') parts.push(policy);
   if (type !== 'all') parts.push(type);

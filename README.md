@@ -1,15 +1,16 @@
-# Caducados PROVESA v2.8
+# Caducados PROVESA v2.9
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Novedades v2.8
+## Novedades v2.9
 
-- Añade carga de políticas de caducidad por proveedor.
-- Incluye por defecto `assets/politicas-caducidad-proveedores.xlsx`.
-- Permite cargar manualmente otro Excel de políticas con el botón **Cargar políticas**.
-- Calcula una nueva columna: **Política caducidad**.
-- Añade filtro por política.
-- Mantiene el formato de artículo como texto, por ejemplo `000026`.
+- Las políticas de caducidad ya no se cargan manualmente desde la app.
+- Las políticas solo se cambian sustituyendo en GitHub el archivo `assets/politicas-caducidad-proveedores.xlsx`.
+- Eliminada la línea de estado al cargar el Excel de SAP.
+- Eliminadas las tarjetas resumen superiores.
+- El filtro de caducidad pasa de días a meses.
+- El filtro mensual incluye todo lo caducado y todos los productos que caduquen hasta fin del mes calculado.
+- Ejemplo: si la fecha actual es 25/08/2026 y se filtra por 6 meses, se incluyen productos hasta el 31/03/2027.
 
 ## Lógica de política
 
@@ -31,8 +32,15 @@ Si un proveedor no aparece en el Excel, se aplica la norma general de 365 días.
 2. Exportar el resultado a Excel.
 3. Abrir la app.
 4. Cargar el Excel de SAP.
-5. La app cargará automáticamente las políticas incluidas si está en Vercel.
-6. Si se abre en local y el navegador bloquea la carga automática, usar el botón **Cargar políticas**.
+5. La app cargará automáticamente las políticas incluidas en `assets/politicas-caducidad-proveedores.xlsx`.
+
+## Actualizar políticas
+
+Para cambiar las políticas, sustituir en GitHub el archivo:
+
+`assets/politicas-caducidad-proveedores.xlsx`
+
+Después hacer redeploy en Vercel o esperar a que Vercel despliegue automáticamente el cambio.
 
 ## Despliegue en Vercel
 
