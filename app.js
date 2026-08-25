@@ -12,6 +12,7 @@ const state = {
   dataFileName: '',
   claims: {},
   selectedClaimIds: new Set(),
+  expandedClaimIds: new Set(),
 };
 
 const COLS = {
@@ -160,7 +161,15 @@ function assignClaimId(row) {
 function loadClaims() {
   try {
     const saved = localStorage.getItem(CLAIMS_STORAGE_KEY);
-    state.claims = saved ? JSON.parse(saved) : {};
+    const parsed = saved ? JSON.parse(saved) : {};
+    const migrated = {};
+    for (const [id, claim] of Object.entries(parsed || {})) {
+      const status = normalizeGestionStatus(claim?.status);
+      if (status === 'Pendiente') continue;
+      migrated[id] = { ...claim, status };
+    }
+    state.claims = migrated;
+    if (saved && JSON.stringify(parsed) !== JSON.stringify(migrated)) saveClaims();
   } catch (err) {
     state.claims = {};
   }
@@ -190,18 +199,29 @@ function currentClaim(row) {
 }
 
 function claimBadge(status) {
-  const s = status || 'Pendiente';
+  const s = normalizeGestionStatus(status);
   let cls = 'blue';
-  if (s === 'Reclamado') cls = 'orange';
-  else if (s === 'En trámite') cls = 'yellow';
-  else if (s === 'Aceptado' || s === 'Abonado') cls = 'green';
-  else if (s === 'Rechazado' || s === 'No reclamar') cls = 'red';
+  if (s === 'En trámite') cls = 'yellow';
+  else if (s === 'En oferta') cls = 'orange';
   return `<span class="badge ${cls}">${escapeHtml(s)}</span>`;
 }
 
 function claimCheckbox(row) {
   const checked = state.selectedClaimIds.has(row.claimId) ? 'checked' : '';
   return `<input type="checkbox" class="claim-checkbox" data-claim-id="${escapeHtml(row.claimId)}" ${checked} aria-label="Seleccionar línea" />`;
+}
+
+function normalizeGestionStatus(status) {
+  const s = norm(status);
+  if (s === 'En oferta') return 'En oferta';
+  if (s === 'Pendiente' || s === '') return 'Pendiente';
+  // Migración suave desde v3.0: cualquier estado antiguo gestionado pasa a En trámite.
+  return 'En trámite';
+}
+
+function gestionStatus(row) {
+  const claim = currentClaim(row);
+  return claim ? normalizeGestionStatus(claim.status) : 'Pendiente';
 }
 
 function getRowsById() {
@@ -235,6 +255,17 @@ function onDocumentChange(event) {
   updateSelectedCount();
 }
 
+function onDocumentClick(event) {
+  if (event.target.closest('input, button, select, textarea, a, label')) return;
+  const row = event.target.closest('tr[data-expand-id]');
+  if (!row) return;
+  const id = row.dataset.expandId;
+  if (!id) return;
+  if (state.expandedClaimIds.has(id)) state.expandedClaimIds.delete(id);
+  else state.expandedClaimIds.add(id);
+  render();
+}
+
 function markSelectedClaims() {
   const rows = selectedRows();
   if (!rows.length) {
@@ -242,11 +273,15 @@ function markSelectedClaims() {
     return;
   }
 
-  const status = el('claimStatusAction').value || 'Reclamado';
+  const status = normalizeGestionStatus(el('claimStatusAction').value || 'En trámite');
   const note = norm(el('claimNoteInput').value);
   const now = new Date().toISOString();
 
   for (const row of rows) {
+    if (status === 'Pendiente') {
+      delete state.claims[row.claimId];
+      continue;
+    }
     const previous = state.claims[row.claimId] || {};
     state.claims[row.claimId] = {
       id: row.claimId,
@@ -307,8 +342,8 @@ function exportClaims() {
   const data = values
     .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
     .map(c => ({
-      'Estado reclamación': c.status || '',
-      'Nota reclamación': c.note || '',
+      'Estado gestión': normalizeGestionStatus(c.status),
+      'Nota gestión': c.note || '',
       'Fecha gestión': c.updatedAt ? new Date(c.updatedAt).toLocaleString('es-ES') : '',
       'Nº artículo': c.item || '',
       'Descripción artículo': c.desc || '',
@@ -451,6 +486,7 @@ function setup() {
   el('exportClaimsBtn').addEventListener('click', exportClaims);
   el('clearClaimsBtn').addEventListener('click', clearAllClaims);
   document.addEventListener('change', onDocumentChange);
+  document.addEventListener('click', onDocumentClick);
   document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
   render();
   autoLoadDefaultPolicies();
@@ -645,8 +681,10 @@ function rowMatchesFilters(r, filters, exclude = '') {
   if (exclude !== 'supplier' && filters.supplier !== 'all' && r.supplier !== filters.supplier) return false;
   if (exclude !== 'policy' && filters.policy !== 'all' && r.policyStatus !== filters.policy) return false;
   if (exclude !== 'claim') {
-    if (filters.claim === 'pending' && hasClaim(r)) return false;
-    if (filters.claim === 'claimed' && !hasClaim(r)) return false;
+    const gestion = gestionStatus(r);
+    if (filters.claim === 'pending' && gestion !== 'Pendiente') return false;
+    if (filters.claim === 'tramite' && gestion !== 'En trámite') return false;
+    if (filters.claim === 'oferta' && gestion !== 'En oferta') return false;
   }
   if (exclude !== 'type' && filters.type !== 'all' && r.type !== filters.type) return false;
   if (exclude !== 'cold' && filters.cold !== 'all' && coldFilterKey(r.cold) !== filters.cold) return false;
@@ -708,6 +746,21 @@ function syncDynamicFilterOptions() {
     .map(value => ({ value, label: value, count: policyCounts.get(value) }));
   changed = resetSelectOptions(el('policyFilter'), 'Todas', policyOptions, filters.policy) || changed;
 
+  const claimRows = optionRowsFor('claim', filters);
+  const claimCounts = new Map();
+  for (const r of claimRows) {
+    const value = gestionStatus(r);
+    claimCounts.set(value, (claimCounts.get(value) || 0) + 1);
+  }
+  const claimOptions = [
+    { value: 'pending', label: 'Pendientes', status: 'Pendiente' },
+    { value: 'tramite', label: 'En trámite', status: 'En trámite' },
+    { value: 'oferta', label: 'En oferta', status: 'En oferta' },
+  ]
+    .filter(o => claimCounts.has(o.status))
+    .map(o => ({ value: o.value, label: o.label, count: claimCounts.get(o.status) }));
+  changed = resetSelectOptions(el('claimFilter'), 'Todos', claimOptions, filters.claim) || changed;
+
   const typeRows = optionRowsFor('type', filters);
   changed = resetSelectOptions(
     el('typeFilter'),
@@ -758,24 +811,14 @@ function applyFilters() {
 
 function setTab(tab) {
   state.activeTab = tab;
-  const claimFilter = el('claimFilter');
-  if (claimFilter) {
-    if (tab === 'reclamados') claimFilter.value = 'claimed';
-    else if (claimFilter.value === 'claimed') claimFilter.value = 'pending';
-  }
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === tab));
-  applyFilters();
 }
 
 function render() {
   renderSummary();
   renderArticles();
   renderLots();
-  renderNext();
-  renderOld();
-  renderSuppliers();
-  renderClaims();
   updateSelectedCount();
 }
 
@@ -854,69 +897,87 @@ function renderArticles() {
 function renderLots() {
   const data = state.filtered;
   el('lotsCount').textContent = `${data.length.toLocaleString('es-ES')} líneas`;
-  renderTable('lotsTable', data, lotColumns());
-}
-
-function renderNext() {
-  const data = state.filtered.filter(r => r.daysExp !== null && r.daysExp <= 180).sort((a,b) => a.daysExp - b.daysExp);
-  el('nextCount').textContent = `${data.length.toLocaleString('es-ES')} líneas`;
-  renderTable('nextTable', data, lotColumns());
-}
-
-function renderOld() {
-  const data = state.filtered.filter(r => r.daysInProvesa !== null && r.daysInProvesa >= 180).sort((a,b) => b.daysInProvesa - a.daysInProvesa);
-  el('oldCount').textContent = `${data.length.toLocaleString('es-ES')} líneas`;
-  renderTable('oldTable', data, lotColumns());
-}
-
-function renderSuppliers() {
-  const map = new Map();
-  for (const r of state.filtered) {
-    const key = r.supplier || 'Sin proveedor';
-    const x = map.get(key) || { supplier: key, items: new Set(), lots: new Set(), stock: 0, minDays: null, old: 0, inPolicy: 0, noReturn: 0 };
-    x.items.add(r.item); x.lots.add(`${r.item}_${r.lot}_${r.warehouse}`); x.stock += r.stock;
-    x.minDays = x.minDays === null ? r.daysExp : Math.min(x.minDays, r.daysExp ?? 999999);
-    if ((r.daysInProvesa ?? 0) >= 180) x.old += r.stock;
-    if (r.policyStatus === 'En política') x.inPolicy += r.stock;
-    if (r.policyStatus === 'No acepta devolución') x.noReturn += r.stock;
-    map.set(key, x);
-  }
-  const data = [...map.values()].sort((a,b) => b.stock - a.stock);
-  el('suppliersCount').textContent = `${data.length.toLocaleString('es-ES')} proveedores`;
-  renderTable('suppliersTable', data, [
-    ['Proveedor entrada', x => x.supplier], ['Artículos', x => fmtNum(x.items.size), 'num'], ['Lotes', x => fmtNum(x.lots.size), 'num'],
-    ['Stock', x => fmtNum(x.stock, 2), 'num'], ['En política', x => fmtNum(x.inPolicy, 2), 'num'], ['Sin devolución', x => fmtNum(x.noReturn, 2), 'num'],
-    ['Caducidad mínima', x => badge(statusFromDays(x.minDays), x.minDays)], ['Días', x => fmtNum(x.minDays), 'num'],
-  ]);
-}
-
-
-function renderClaims() {
-  const filters = getFilterValues();
-  const data = state.rows
-    .filter(r => rowMatchesFilters(r, filters, 'claim') && hasClaim(r))
-    .sort((a, b) => {
-      const ac = currentClaim(a);
-      const bc = currentClaim(b);
-      return String(bc?.updatedAt || '').localeCompare(String(ac?.updatedAt || ''));
-    });
-  const count = el('claimsCount');
-  if (count) count.textContent = `${data.length.toLocaleString('es-ES')} líneas reclamadas/en trámite`;
-  if (el('claimsTable')) renderTable('claimsTable', data, lotColumns());
+  renderExpandableTable('lotsTable', data, lotColumns());
 }
 
 function lotColumns() {
   return [
     ['Sel.', r => claimCheckbox(r)],
-    ['Gestión', r => currentClaim(r) ? claimBadge(currentClaim(r).status) : claimBadge('Pendiente')],
+    ['Gestión', r => claimBadge(gestionStatus(r))],
     ['Nota recl.', r => currentClaim(r) ? escapeHtml(currentClaim(r).note || '') : ''],
-    ['Nº artículo', r => r.item], ['Descripción', r => r.desc], ['Grupo', r => r.group], ['Tipo', r => r.type], ['Frío', r => r.cold],
-    ['Lote', r => r.lot], ['Almacén', r => r.warehouse], ['Stock', r => fmtNum(r.stock, 2), 'num'],
-    ['Caducidad', r => fmtDate(r.exp)], ['Estado', r => badge(r.status, r.daysExp)], ['Política', r => policyBadge(r.policyStatus)], ['Días cad.', r => fmtNum(r.daysExp), 'num'],
-    ['Entrada real', r => fmtDate(r.entryDate)], ['Días en PROVESA', r => fmtNum(r.daysInProvesa), 'num'],
-    ['Última compra', r => fmtDate(r.lastPurchaseDate)], ['Último cliente artículo', r => r.lastArticleClient], ['Último cliente lote', r => r.lastLotClient],
-    ['Proveedor entrada', r => r.supplier], ['Nº entrada', r => r.entryDoc]
+    ['Nº artículo', r => r.item],
+    ['Descripción', r => r.desc],
+    ['Grupo', r => r.group],
+    ['Tipo', r => r.type],
+    ['Frío', r => r.cold],
+    ['Lote', r => r.lot],
+    ['Almacén', r => r.warehouse],
+    ['Stock', r => fmtNum(r.stock, 2), 'num'],
+    ['Caducidad', r => fmtDate(r.exp)],
+    ['Estado', r => badge(r.status, r.daysExp)],
+    ['Política', r => policyBadge(r.policyStatus)],
   ];
+}
+
+function lotDetailFields(r) {
+  return [
+    ['Entrada', fmtDate(r.entryDate)],
+    ['Nº entrada', r.entryDoc],
+    ['Proveedor entrada', r.supplier],
+    ['Días caducidad', r.daysExp === null ? '' : fmtNum(r.daysExp)],
+    ['Días vida útil al entrar', r.daysLife === null ? '' : fmtNum(r.daysLife)],
+    ['Meses vida útil al entrar', r.monthsLife === null ? '' : fmtNum(r.monthsLife, 2)],
+    ['Última compra', fmtDate(r.lastPurchaseDate)],
+    ['Nº última entrada compra', r.lastPurchaseDoc],
+    ['Último cliente artículo', r.lastArticleClient],
+    ['Fecha último albarán artículo', fmtDate(r.lastArticleSaleDate)],
+    ['Nº último albarán artículo', r.lastArticleSaleDoc],
+    ['Último cliente lote', r.lastLotClient],
+    ['Fecha último albarán lote', fmtDate(r.lastLotSaleDate)],
+    ['Nº último albarán lote', r.lastLotSaleDoc],
+    ['Base política', r.policyBasis],
+    ['Nota política', r.policyNote],
+    ['Origen política', r.policySource],
+    ['ID caducidad', r.claimId],
+  ];
+}
+
+function renderLotDetails(row) {
+  const fields = lotDetailFields(row).filter(([, value]) => value !== undefined && value !== null && String(value) !== '');
+  return `
+    <div class="detail-box">
+      <div class="detail-title">Detalle de la línea</div>
+      <div class="detail-grid">
+        ${fields.map(([label, value]) => `
+          <div class="detail-item">
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(value)}</strong>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderExpandableTable(id, data, cols) {
+  const table = el(id);
+  if (!data.length) {
+    table.innerHTML = `<tbody><tr><td>${document.getElementById('emptyTemplate').innerHTML}</td></tr></tbody>`;
+    return;
+  }
+  table.innerHTML = `
+    <thead><tr>${cols.map(([h]) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+    <tbody>${data.map(row => {
+      const rowId = row.claimId;
+      const safeRowId = escapeHtml(rowId);
+      const expanded = state.expandedClaimIds.has(rowId);
+      const main = `<tr class="expandable-row ${expanded ? 'expanded' : ''}" data-expand-id="${safeRowId}" title="Clic para ver detalle">
+        ${cols.map(([h, fn, cls]) => `<td class="${cls || ''}">${fn(row) ?? ''}</td>`).join('')}
+      </tr>`;
+      const detail = expanded ? `<tr class="detail-row" data-detail-for="${safeRowId}"><td colspan="${cols.length}">${renderLotDetails(row)}</td></tr>` : '';
+      return main + detail;
+    }).join('')}</tbody>
+  `;
 }
 
 function renderTable(id, data, cols) {
@@ -940,8 +1001,8 @@ function exportView() {
     'Fecha caducidad': fmtDate(r.exp),
     'Estado caducidad': r.status,
     'Política caducidad': r.policyStatus,
-    'Estado reclamación': currentClaim(r)?.status || '',
-    'Nota reclamación': currentClaim(r)?.note || '',
+    'Estado gestión': gestionStatus(r),
+    'Nota gestión': currentClaim(r)?.note || '',
     'Stock': r.stock,
     'Fecha entrada real': fmtDate(r.entryDate),
     'Último cliente que compró artículo': r.lastArticleClient,
@@ -965,10 +1026,10 @@ function exportView() {
     { wch: 12 }, // Fecha caducidad
     { wch: 18 }, // Estado caducidad
     { wch: 18 }, // Política caducidad
-    { wch: 18 }, // Estado reclamación
-    { wch: 28 }, // Nota reclamación
+    { wch: 18 }, // Estado gestión
+    { wch: 28 }, // Nota gestión
     { wch: 9 },  // Stock
-    { wch: 12 }, // Fecha entrada real
+    { wch: 12 }, // Entrada
     { wch: 24 }, // Último cliente
     { wch: 24 }, // Proveedor entrada
     { wch: 12 }  // Nº entrada mercancía
@@ -1020,7 +1081,8 @@ function activeFilterParts() {
   if (supplier !== 'all') parts.push(supplier);
   if (policy !== 'all') parts.push(policy);
   if (claim === 'pending') parts.push('pendientes');
-  else if (claim === 'claimed') parts.push('reclamados');
+  else if (claim === 'tramite') parts.push('en tramite');
+  else if (claim === 'oferta') parts.push('en oferta');
   else if (claim === 'all') parts.push('todos gestion');
   if (type !== 'all') parts.push(type);
   if (cold !== 'all') parts.push(normKey(cold) === 'si' ? 'frio' : 'no frio');

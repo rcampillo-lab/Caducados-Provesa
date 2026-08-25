@@ -64,7 +64,8 @@
           Gestión
           <select id="claimFilter">
             <option value="pending" selected>Pendientes</option>
-            <option value="claimed">Reclamados / en trámite</option>
+            <option value="tramite">En trámite</option>
+            <option value="oferta">En oferta</option>
             <option value="all">Todos</option>
           </select>
         </label>
@@ -100,7 +101,7 @@
       <div class="claims-panel__header">
         <div>
           <h2>Gestión de reclamaciones</h2>
-          <p>Marca líneas como reclamadas, en trámite o no reclamables. Se guarda solo en este navegador.</p>
+          <p>Marca líneas como En trámite o En oferta. Si las devuelves a Pendiente, vuelven a la vista normal. Se guarda solo en este navegador.</p>
         </div>
         <strong id="selectedCount">0 seleccionadas</strong>
       </div>
@@ -108,20 +109,17 @@
         <label>
           Estado
           <select id="claimStatusAction">
-            <option value="Reclamado">Reclamado</option>
             <option value="En trámite">En trámite</option>
-            <option value="Aceptado">Aceptado</option>
-            <option value="Rechazado">Rechazado</option>
-            <option value="Abonado">Abonado</option>
-            <option value="No reclamar">No reclamar</option>
+            <option value="En oferta">En oferta</option>
+            <option value="Pendiente">Pendiente</option>
           </select>
         </label>
         <label class="claims-note">
           Nota
-          <input id="claimNoteInput" type="text" placeholder="Ej.: reclamado a proveedor, esperando abono, no procede..." />
+          <input id="claimNoteInput" type="text" placeholder="Ej.: reclamado a proveedor, pendiente de oferta, esperando respuesta..." />
         </label>
         <button id="claimSelectedBtn" class="ghost" disabled>Guardar estado</button>
-        <button id="unclaimSelectedBtn" class="ghost" disabled>Devolver a pendientes</button>
+        <button id="unclaimSelectedBtn" class="ghost" disabled>Poner pendiente</button>
         <button id="exportClaimsBtn" class="ghost">Exportar reclamaciones</button>
         <button id="clearClaimsBtn" class="danger">Borrar reclamaciones locales</button>
       </div>
@@ -131,10 +129,6 @@
       <button class="tab active" data-tab="resumen">Resumen</button>
       <button class="tab" data-tab="articulos">Artículos</button>
       <button class="tab" data-tab="lotes">Lotes</button>
-      <button class="tab" data-tab="reclamados">Reclamados</button>
-      <button class="tab" data-tab="proximos">Próximos</button>
-      <button class="tab" data-tab="antiguo">Stock antiguo</button>
-      <button class="tab" data-tab="proveedores">Proveedores entrada</button>
     </nav>
 
     <main>
@@ -159,26 +153,6 @@
       <section id="lotes" class="tab-panel">
         <div class="panel-header"><h2>Lotes y entradas reales</h2><span id="lotsCount"></span></div>
         <div class="table-wrap"><table id="lotsTable"></table></div>
-      </section>
-
-      <section id="reclamados" class="tab-panel">
-        <div class="panel-header"><h2>Reclamados / en trámite</h2><span id="claimsCount"></span></div>
-        <div class="table-wrap"><table id="claimsTable"></table></div>
-      </section>
-
-      <section id="proximos" class="tab-panel">
-        <div class="panel-header"><h2>Próximos a caducar</h2><span id="nextCount"></span></div>
-        <div class="table-wrap"><table id="nextTable"></table></div>
-      </section>
-
-      <section id="antiguo" class="tab-panel">
-        <div class="panel-header"><h2>Stock con más tiempo en PROVESA</h2><span id="oldCount"></span></div>
-        <div class="table-wrap"><table id="oldTable"></table></div>
-      </section>
-
-      <section id="proveedores" class="tab-panel">
-        <div class="panel-header"><h2>Proveedores de entrada</h2><span id="suppliersCount"></span></div>
-        <div class="table-wrap"><table id="suppliersTable"></table></div>
       </section>
     </main>
   </div>

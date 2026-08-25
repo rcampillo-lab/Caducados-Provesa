@@ -1,39 +1,62 @@
-# Caducados PROVESA v3.0
+# Caducados PROVESA v3.1
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Novedades v3.0
+## Novedades v3.1
 
-- Añadida gestión local de reclamaciones.
-- Se pueden seleccionar líneas de lote/entrada y guardarlas como:
-  - Reclamado
+- Se simplifican las secciones visibles a:
+  - Resumen
+  - Artículos
+  - Lotes
+- Se eliminan de la interfaz las pestañas:
+  - Reclamados
+  - Próximos
+  - Stock antiguo
+  - Proveedores entrada
+- Los estados de gestión quedan reducidos a:
+  - Pendiente
   - En trámite
-  - Aceptado
-  - Rechazado
-  - Abonado
-  - No reclamar
-- Se puede añadir una nota de reclamación.
-- Las líneas guardadas dejan de aparecer en la vista de **Pendientes**.
-- Nueva pestaña **Reclamados** para consultar lo reclamado o en trámite.
-- Nuevo filtro **Gestión**:
-  - Pendientes
-  - Reclamados / en trámite
-  - Todos
-- Botón **Devolver a pendientes** para quitar una línea de reclamados.
-- Botón **Exportar reclamaciones** para descargar el histórico local a Excel.
-- Botón **Borrar reclamaciones locales** para limpiar el navegador.
+  - En oferta
+- La sección **Lotes** muestra solo las columnas principales:
+  - Sel.
+  - Gestión
+  - Nota recl.
+  - Nº artículo
+  - Descripción
+  - Grupo
+  - Tipo
+  - Frío
+  - Lote
+  - Almacén
+  - Stock
+  - Caducidad
+  - Estado
+  - Política
+- Al hacer clic en una línea de **Lotes**, se despliega el detalle con el resto de información.
+- La columna **Entrada real** pasa a mostrarse como **Entrada** dentro del detalle.
+- Se elimina de la tabla principal la columna de proveedor, días de caducidad y días en PROVESA.
+- La cabecera de las tablas queda fija al bajar por el listado.
 
-## Importante sobre el guardado
+## Gestión local
 
-Esta versión guarda las reclamaciones en el navegador mediante almacenamiento local.
+La app guarda la gestión en el navegador mediante almacenamiento local.
 
 Esto significa:
 
 - No hay base de datos.
 - No se guarda en GitHub.
 - No se comparte entre ordenadores ni entre navegadores.
-- Si se borra la caché/datos del navegador, se pueden perder las reclamaciones.
+- Apagar el PC o cerrar el navegador no borra los datos.
+- Si se borran los datos del sitio/caché del navegador, se pueden perder.
 - Para conservar copia de seguridad, usar periódicamente **Exportar reclamaciones**.
+
+## Lógica de estados
+
+- **Pendiente**: estado normal. La línea aparece en la vista pendiente.
+- **En trámite**: la línea queda marcada como gestionada.
+- **En oferta**: la línea queda marcada como gestionada para salida/oferta.
+
+Si seleccionas una línea y la pones en **Pendiente**, se elimina su gestión local y vuelve a la vista pendiente.
 
 ## Lógica de identificación
 
@@ -46,7 +69,7 @@ Cada línea se identifica internamente por:
 - Nº entrada mercancía
 - Proveedor entrada
 
-Así, al cargar un nuevo Excel de SAP, si la misma línea sigue existiendo, la app la reconoce como ya reclamada/en trámite.
+Así, al cargar un nuevo Excel de SAP, si la misma línea sigue existiendo, la app la reconoce como ya gestionada.
 
 ## Lógica de política
 
