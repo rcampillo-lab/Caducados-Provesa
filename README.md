@@ -1,44 +1,37 @@
-# Caducados PROVESA v3.5
-## Cambios v3.5
-
-- Añadida la columna principal **Proveedor entrada** en la tabla de Lotes.
-- Limpiado el desplegable de detalle eliminando: Grupo, ID caducidad, Origen política, Nota política, Días de caducidad y Vida útil al entrar.
-- Se mantienen en el detalle los campos operativos: Tipo, Frío, Entrada, Nº entrada, últimas compras/albaranes y Base política.
+# Caducados PROVESA v3.6
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Novedades v3.5
+## Cambios v3.6
 
-- Se simplifican las secciones visibles a:
-  - Resumen
-  - Artículos
-  - Lotes
-- Se eliminan de la interfaz las pestañas:
-  - Reclamados
-  - Próximos
-  - Stock antiguo
-  - Proveedores entrada
-- Los estados de gestión quedan reducidos a:
-  - Pendiente
-  - En trámite
-  - En oferta
-- La sección **Lotes** muestra solo las columnas principales:
-  - Sel.
-  - Gestión
-  - Nota recl.
-  - Nº artículo
-  - Descripción
-  - Proveedor entrada
-  - Lote
-  - Almacén
-  - Stock
-  - Caducidad
-  - Estado
-  - Política
-- Al hacer clic en una línea de **Lotes**, se despliega el detalle con el resto de información útil.
-- La columna **Entrada real** pasa a mostrarse como **Entrada** dentro del detalle.
-- Se eliminan del detalle: Grupo, ID caducidad, Origen política, Nota política, Días de caducidad y Vida útil al entrar.
-- La cabecera de las tablas queda fija al bajar por el listado.
+Se añade el bloque **Exportaciones de gestión** con cuatro exportaciones específicas:
+
+1. **Caducados fuera política**
+   - Columnas: Nº artículo, Descripción, Cantidad, Lote.
+   - Agrupa por Nº artículo + Descripción + Lote.
+
+2. **Caducados en política por proveedor**
+   - Crea un Excel con una hoja por proveedor.
+   - Columnas: Nº artículo, Descripción, Cantidad, Lote, Albarán de compra, Fecha de compra.
+   - Agrupa por proveedor + Nº artículo + lote + albarán/entrada + fecha de compra.
+
+3. **Ofertas compañía fuera política**
+   - Para artículos no caducados, fuera de política y de animales de compañía.
+   - Columnas: Nº artículo, Descripción, Cantidad, Lote, Fecha de caducidad, Descuento.
+   - La columna Descuento queda vacía para rellenarla manualmente.
+
+4. **Producción fuera política**
+   - Para artículos no caducados, fuera de política y de animales de producción.
+   - Columnas: Descripción, Lote, Cantidad, Fecha de caducidad, Última entrada del lote, Última venta artículo, Cliente, Acción/respuesta.
+   - La columna Acción/respuesta queda vacía para rellenarla manualmente.
+
+## Lógica de exportación
+
+- Antes de exportar se debe seleccionar un almacén concreto: **01** o **02**.
+- Las exportaciones respetan el almacén seleccionado.
+- También respetan filtros compatibles como proveedor, búsqueda, gestión y frío.
+- Las exportaciones de caducados fuerzan la condición de caducado, aunque el filtro de caducidad esté en otro valor.
+- Las exportaciones de compañía/producción fuera de política respetan el filtro de caducidad activo para poder trabajar, por ejemplo, próximos 6 meses.
 
 ## Gestión local
 
@@ -53,13 +46,30 @@ Esto significa:
 - Si se borran los datos del sitio/caché del navegador, se pueden perder.
 - Para conservar copia de seguridad, usar periódicamente **Exportar reclamaciones**.
 
-## Lógica de estados
+## Estados de gestión
 
 - **Pendiente**: estado normal. La línea aparece en la vista pendiente.
 - **En trámite**: la línea queda marcada como gestionada.
 - **En oferta**: la línea queda marcada como gestionada para salida/oferta.
 
 Si seleccionas una línea y la pones en **Pendiente**, se elimina su gestión local y vuelve a la vista pendiente.
+
+## Columnas principales en Lotes
+
+- Sel.
+- Gestión
+- Nota recl.
+- Nº artículo
+- Descripción
+- Proveedor entrada
+- Lote
+- Almacén
+- Stock
+- Caducidad
+- Estado
+- Política
+
+Al hacer clic en una línea de **Lotes**, se despliega el detalle con el resto de información útil.
 
 ## Lógica de identificación
 
@@ -88,16 +98,15 @@ Interpretación del Excel de políticas:
 
 Si un proveedor no aparece en el Excel, se aplica la norma general de 365 días.
 
-## Uso
+## Uso básico
 
 1. Ejecutar la query en SAP.
 2. Exportar el resultado a Excel.
 3. Abrir la app.
 4. Cargar el Excel de SAP.
-5. Filtrar los productos.
-6. Seleccionar las líneas que quieras gestionar.
-7. Elegir estado y escribir una nota si procede.
-8. Pulsar **Guardar estado**.
+5. Seleccionar almacén 01 o 02.
+6. Filtrar los productos.
+7. Exportar la gestión correspondiente o marcar líneas como En trámite / En oferta.
 
 ## Actualizar políticas
 
@@ -112,8 +121,3 @@ Después hacer redeploy en Vercel o esperar a que Vercel despliegue automáticam
 Framework Preset: **Other**
 
 Sin build command, sin `package.json` y sin `vercel.json`.
-
-
-## Cambios v3.5
-- Eliminado del desplegable de detalle el campo **Nº última entrada compra**.
-- Se mantiene el resto de funcionalidades de v3.4.

@@ -236,3 +236,36 @@ button.ghost:disabled {
   .table-wrap { max-height: calc(100vh - 210px); }
   .detail-grid { grid-template-columns: 1fr; }
 }
+
+
+/* Exportaciones de gestión v3.6 */
+.exports-panel {
+  background: rgba(255,255,255,.92);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin: 0 0 14px;
+}
+.exports-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.exports-panel h2 { margin: 0 0 4px; font-size: 19px; }
+.exports-panel p { margin: 0; color: var(--muted); font-weight: 600; }
+.exports-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 10px;
+}
+.exports-actions button { white-space: normal; text-align: center; }
+@media (max-width: 1100px) {
+  .exports-actions { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .exports-panel__header { display: block; }
+  .exports-actions { grid-template-columns: 1fr; }
+}

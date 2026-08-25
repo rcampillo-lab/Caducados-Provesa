@@ -513,6 +513,14 @@ function setup() {
   });
   el('clearBtn').addEventListener('click', clearFilters);
   el('exportBtn').addEventListener('click', exportView);
+  const exportExpiredOutPolicyBtn = el('exportExpiredOutPolicyBtn');
+  if (exportExpiredOutPolicyBtn) exportExpiredOutPolicyBtn.addEventListener('click', exportExpiredOutPolicy);
+  const exportExpiredInPolicyBtn = el('exportExpiredInPolicyBtn');
+  if (exportExpiredInPolicyBtn) exportExpiredInPolicyBtn.addEventListener('click', exportExpiredInPolicyBySupplier);
+  const exportPetOutPolicyBtn = el('exportPetOutPolicyBtn');
+  if (exportPetOutPolicyBtn) exportPetOutPolicyBtn.addEventListener('click', exportPetOutPolicyOffers);
+  const exportProductionOutPolicyBtn = el('exportProductionOutPolicyBtn');
+  if (exportProductionOutPolicyBtn) exportProductionOutPolicyBtn.addEventListener('click', exportProductionOutPolicy);
   el('claimSelectedBtn').addEventListener('click', markSelectedClaims);
   el('unclaimSelectedBtn').addEventListener('click', unclaimSelected);
   el('exportClaimsBtn').addEventListener('click', exportClaims);
@@ -641,6 +649,7 @@ async function onFile(e) {
   populateTypes();
   populateWarehouses();
   el('exportBtn').disabled = state.rows.length === 0;
+  updateGestionExportButtons();
   updateStatusCard();
   applyFilters();
 }
@@ -1031,6 +1040,343 @@ function renderTable(id, data, cols) {
     <thead><tr>${cols.map(([h]) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
     <tbody>${data.map(row => `<tr>${cols.map(([h, fn, cls]) => `<td class="${cls || ''}">${fn(row) ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>
   `;
+}
+
+
+function updateGestionExportButtons() {
+  ['exportExpiredOutPolicyBtn','exportExpiredInPolicyBtn','exportPetOutPolicyBtn','exportProductionOutPolicyBtn'].forEach(id => {
+    const button = el(id);
+    if (button) button.disabled = state.rows.length === 0;
+  });
+}
+
+function requireWarehouseForGestionExport() {
+  const wh = el('warehouseFilter').value;
+  if (wh === 'all') {
+    alert('Selecciona primero un almacén: 01 o 02. Así evitamos mezclar gestiones de almacenes distintos.');
+    return '';
+  }
+  return wh;
+}
+
+function isInPolicy(row) {
+  return row.policyStatus === 'En política';
+}
+
+function isOutOfPolicy(row) {
+  return !isInPolicy(row);
+}
+
+function isPetType(row) {
+  return normKey(row.type).includes('compania');
+}
+
+function isProductionType(row) {
+  return normKey(row.type).includes('produccion');
+}
+
+function isNotExpired(row) {
+  const exp = parseDate(row.exp);
+  if (!exp) return false;
+  exp.setHours(0, 0, 0, 0);
+  return exp >= todayDateOnly();
+}
+
+function rowMatchesExportBaseFilters(row, ignore = {}) {
+  const filters = getFilterValues();
+  const hay = normKey([row.item, row.desc, row.group, row.type, row.lot, row.warehouse, row.supplier, row.lastArticleClient, row.lastLotClient].join(' '));
+
+  if (!ignore.search && filters.q && !hay.includes(filters.q)) return false;
+
+  if (!ignore.expiry) {
+    if (filters.expiry === 'expired' && !isCurrentlyExpired(row)) return false;
+    if (!['all','expired'].includes(filters.expiry) && !expiresWithinMonths(row, Number(filters.expiry))) return false;
+  }
+
+  if (!ignore.supplier && filters.supplier !== 'all' && row.supplier !== filters.supplier) return false;
+  if (!ignore.policy && filters.policy !== 'all' && row.policyStatus !== filters.policy) return false;
+  if (!ignore.claim) {
+    const gestion = gestionStatus(row);
+    if (filters.claim === 'pending' && gestion !== 'Pendiente') return false;
+    if (filters.claim === 'tramite' && gestion !== 'En trámite') return false;
+    if (filters.claim === 'oferta' && gestion !== 'En oferta') return false;
+  }
+  if (!ignore.type && filters.type !== 'all' && row.type !== filters.type) return false;
+  if (!ignore.cold && filters.cold !== 'all' && coldFilterKey(row.cold) !== filters.cold) return false;
+  if (!ignore.warehouse && filters.wh !== 'all' && row.warehouse !== filters.wh) return false;
+
+  return true;
+}
+
+function exportRowsForGestion(kind) {
+  if (!requireWarehouseForGestionExport()) return [];
+
+  if (kind === 'expiredOutPolicy') {
+    return state.rows.filter(row =>
+      rowMatchesExportBaseFilters(row, { expiry: true, policy: true, type: true }) &&
+      isCurrentlyExpired(row) &&
+      isOutOfPolicy(row)
+    );
+  }
+
+  if (kind === 'expiredInPolicy') {
+    return state.rows.filter(row =>
+      rowMatchesExportBaseFilters(row, { expiry: true, policy: true, type: true }) &&
+      isCurrentlyExpired(row) &&
+      isInPolicy(row)
+    );
+  }
+
+  if (kind === 'petOutPolicy') {
+    return state.rows.filter(row =>
+      rowMatchesExportBaseFilters(row, { policy: true, type: true }) &&
+      isNotExpired(row) &&
+      isOutOfPolicy(row) &&
+      isPetType(row)
+    );
+  }
+
+  if (kind === 'productionOutPolicy') {
+    return state.rows.filter(row =>
+      rowMatchesExportBaseFilters(row, { policy: true, type: true }) &&
+      isNotExpired(row) &&
+      isOutOfPolicy(row) &&
+      isProductionType(row)
+    );
+  }
+
+  return [];
+}
+
+function groupRows(rows, keyFn, seedFn, mergeFn) {
+  const map = new Map();
+  for (const row of rows) {
+    const key = keyFn(row);
+    if (!map.has(key)) map.set(key, seedFn(row));
+    else mergeFn(map.get(key), row);
+  }
+  return [...map.values()];
+}
+
+function maxDateValue(a, b) {
+  const da = parseDate(a);
+  const db = parseDate(b);
+  if (!da) return b || a || '';
+  if (!db) return a || b || '';
+  return db > da ? b : a;
+}
+
+function exportExpiredOutPolicy() {
+  const rows = exportRowsForGestion('expiredOutPolicy');
+  if (!rows.length) {
+    alert('No hay caducados fuera de política con los filtros actuales.');
+    return;
+  }
+
+  const data = groupRows(
+    rows,
+    r => [r.item, r.desc, r.lot].join('|'),
+    r => ({
+      'Nº artículo': r.item,
+      'Descripción': r.desc,
+      'Cantidad': r.stock,
+      'Lote': r.lot,
+    }),
+    (acc, r) => { acc['Cantidad'] += r.stock; }
+  ).sort((a, b) => String(a['Nº artículo']).localeCompare(String(b['Nº artículo']), 'es') || String(a['Lote']).localeCompare(String(b['Lote']), 'es'));
+
+  writeGestionWorkbook(
+    `caducados_fuera_politica_almacen_${el('warehouseFilter').value}`,
+    [{ name: 'Caducados fuera política', data, widths: [12, 46, 12, 18] }]
+  );
+}
+
+function exportExpiredInPolicyBySupplier() {
+  const rows = exportRowsForGestion('expiredInPolicy');
+  if (!rows.length) {
+    alert('No hay caducados en política con los filtros actuales.');
+    return;
+  }
+
+  const bySupplier = new Map();
+  for (const row of rows) {
+    const supplier = row.supplier || 'Sin proveedor';
+    if (!bySupplier.has(supplier)) bySupplier.set(supplier, []);
+    bySupplier.get(supplier).push(row);
+  }
+
+  const sheets = [...bySupplier.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], 'es'))
+    .map(([supplier, supplierRows]) => {
+      const data = groupRows(
+        supplierRows,
+        r => [r.item, r.desc, r.lot, r.entryDoc, toIsoDate(r.entryDate)].join('|'),
+        r => ({
+          'Nº artículo': r.item,
+          'Descripción': r.desc,
+          'Cantidad': r.stock,
+          'Lote': r.lot,
+          'Albarán de compra': r.entryDoc,
+          'Fecha de compra': fmtDate(r.entryDate),
+        }),
+        (acc, r) => { acc['Cantidad'] += r.stock; }
+      ).sort((a, b) => String(a['Nº artículo']).localeCompare(String(b['Nº artículo']), 'es') || String(a['Lote']).localeCompare(String(b['Lote']), 'es'));
+      return { name: supplier, data, widths: [12, 46, 12, 18, 18, 16] };
+    });
+
+  writeGestionWorkbook(`caducados_en_politica_almacen_${el('warehouseFilter').value}`, sheets);
+}
+
+function exportPetOutPolicyOffers() {
+  const rows = exportRowsForGestion('petOutPolicy');
+  if (!rows.length) {
+    alert('No hay artículos de compañía no caducados fuera de política con los filtros actuales.');
+    return;
+  }
+
+  const data = groupRows(
+    rows,
+    r => [r.item, r.desc, r.lot, toIsoDate(r.exp)].join('|'),
+    r => ({
+      'Nº artículo': r.item,
+      'Descripción': r.desc,
+      'Cantidad': r.stock,
+      'Lote': r.lot,
+      'Fecha de caducidad': fmtDate(r.exp),
+      'Descuento': '',
+    }),
+    (acc, r) => { acc['Cantidad'] += r.stock; }
+  ).sort((a, b) => String(a['Fecha de caducidad']).localeCompare(String(b['Fecha de caducidad']), 'es') || String(a['Nº artículo']).localeCompare(String(b['Nº artículo']), 'es'));
+
+  writeGestionWorkbook(
+    `ofertas_compania_fuera_politica_almacen_${el('warehouseFilter').value}`,
+    [{ name: 'Ofertas compañía', data, widths: [12, 46, 12, 18, 18, 14] }]
+  );
+}
+
+function exportProductionOutPolicy() {
+  const rows = exportRowsForGestion('productionOutPolicy');
+  if (!rows.length) {
+    alert('No hay artículos de producción no caducados fuera de política con los filtros actuales.');
+    return;
+  }
+
+  const data = groupRows(
+    rows,
+    r => [r.desc, r.lot, toIsoDate(r.exp)].join('|'),
+    r => ({
+      'Descripción': r.desc,
+      'Lote': r.lot,
+      'Cantidad': r.stock,
+      'Fecha de caducidad': fmtDate(r.exp),
+      'Última entrada del lote': fmtDate(r.entryDate),
+      'Última venta artículo': fmtDate(r.lastArticleSaleDate),
+      'Cliente': r.lastArticleClient || '',
+      'Acción/respuesta': '',
+      _lastEntryRaw: r.entryDate,
+      _lastSaleRaw: r.lastArticleSaleDate,
+    }),
+    (acc, r) => {
+      acc['Cantidad'] += r.stock;
+      const entry = maxDateValue(acc._lastEntryRaw, r.entryDate);
+      acc._lastEntryRaw = entry;
+      acc['Última entrada del lote'] = fmtDate(entry);
+      const sale = maxDateValue(acc._lastSaleRaw, r.lastArticleSaleDate);
+      if (toIsoDate(sale) !== toIsoDate(acc._lastSaleRaw)) acc['Cliente'] = r.lastArticleClient || acc['Cliente'];
+      acc._lastSaleRaw = sale;
+      acc['Última venta artículo'] = fmtDate(sale);
+    }
+  ).map(({ _lastEntryRaw, _lastSaleRaw, ...x }) => x)
+   .sort((a, b) => String(a['Fecha de caducidad']).localeCompare(String(b['Fecha de caducidad']), 'es') || String(a['Descripción']).localeCompare(String(b['Descripción']), 'es'));
+
+  writeGestionWorkbook(
+    `produccion_fuera_politica_almacen_${el('warehouseFilter').value}`,
+    [{ name: 'Producción fuera política', data, widths: [46, 18, 12, 18, 18, 18, 34, 26] }]
+  );
+}
+
+function writeGestionWorkbook(fileBaseName, sheets) {
+  const wb = XLSX.utils.book_new();
+  const usedNames = new Set();
+
+  for (const sheet of sheets) {
+    if (!sheet.data.length) continue;
+    const ws = XLSX.utils.json_to_sheet(sheet.data);
+    applyGestionSheetFormat(ws, sheet.data, sheet.widths || []);
+    const sheetName = uniqueSheetName(sheet.name || 'Hoja', usedNames);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  }
+
+  if (!wb.SheetNames.length) {
+    alert('No hay datos para exportar.');
+    return;
+  }
+
+  const wh = el('warehouseFilter').value;
+  const suffix = activeFilterParts()
+    .filter(part => !part.toLowerCase().includes('almacen'))
+    .join('_');
+  const finalName = sanitizeFileName(`${fileBaseName}${suffix ? '_' + suffix : ''}`);
+  XLSX.writeFile(wb, `${finalName}.xlsx`);
+}
+
+function applyGestionSheetFormat(ws, data, widths) {
+  const columns = Object.keys(data[0] || {});
+  ws['!cols'] = columns.map((_, i) => ({ wch: widths[i] || 16 }));
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+  if (columns.length) {
+    const lastCol = columnLetter(columns.length - 1);
+    ws['!autofilter'] = { ref: `A1:${lastCol}${Math.max(1, data.length + 1)}` };
+  }
+  ws['!margins'] = {
+    left: 0.25,
+    right: 0.25,
+    top: 0.35,
+    bottom: 0.35,
+    header: 0.15,
+    footer: 0.15
+  };
+  ws['!pageSetup'] = {
+    paperSize: 9,
+    orientation: 'landscape',
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    horizontalCentered: true
+  };
+  for (let c = 0; c < columns.length; c += 1) {
+    const ref = `${columnLetter(c)}1`;
+    if (!ws[ref]) continue;
+    ws[ref].s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: '1767C2' } },
+      alignment: { horizontal: 'center', vertical: 'center' }
+    };
+  }
+}
+
+function columnLetter(index) {
+  let n = index + 1;
+  let s = '';
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+function uniqueSheetName(base, usedNames) {
+  const clean = sanitizeSheetName(base) || 'Hoja';
+  let candidate = clean;
+  let i = 2;
+  while (usedNames.has(candidate)) {
+    const suffix = ` ${i}`;
+    candidate = `${clean.slice(0, 31 - suffix.length)}${suffix}`;
+    i += 1;
+  }
+  usedNames.add(candidate);
+  return candidate;
 }
 
 function exportView() {
