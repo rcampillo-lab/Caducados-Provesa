@@ -1,4 +1,4 @@
-# Caducados PROVESA v3.6
+# Caducados PROVESA v3.7
 
 App estática tipo **Other** para Vercel/GitHub.
 
@@ -121,3 +121,7 @@ Después hacer redeploy en Vercel o esperar a que Vercel despliegue automáticam
 Framework Preset: **Other**
 
 Sin build command, sin `package.json` y sin `vercel.json`.
+
+
+## v3.7
+- La exportación de ofertas de compañía fuera de política se ordena por fecha de caducidad ascendente, dejando arriba los productos que caducan antes.

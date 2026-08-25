@@ -1244,9 +1244,14 @@ function exportPetOutPolicyOffers() {
       'Lote': r.lot,
       'Fecha de caducidad': fmtDate(r.exp),
       'Descuento': '',
+      '_sortCaducidad': toIsoDate(r.exp),
     }),
     (acc, r) => { acc['Cantidad'] += r.stock; }
-  ).sort((a, b) => String(a['Fecha de caducidad']).localeCompare(String(b['Fecha de caducidad']), 'es') || String(a['Nº artículo']).localeCompare(String(b['Nº artículo']), 'es'));
+  ).sort((a, b) =>
+    String(a['_sortCaducidad'] || '9999-12-31').localeCompare(String(b['_sortCaducidad'] || '9999-12-31')) ||
+    String(a['Nº artículo']).localeCompare(String(b['Nº artículo']), 'es') ||
+    String(a['Lote']).localeCompare(String(b['Lote']), 'es')
+  ).map(({ _sortCaducidad, ...row }) => row);
 
   writeGestionWorkbook(
     `ofertas_compania_fuera_politica_almacen_${el('warehouseFilter').value}`,
