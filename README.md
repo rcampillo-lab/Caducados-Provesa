@@ -1,5 +1,5 @@
-# Caducados PROVESA v3.4
-## Cambios v3.4
+# Caducados PROVESA v3.5
+## Cambios v3.5
 
 - Añadida la columna principal **Proveedor entrada** en la tabla de Lotes.
 - Limpiado el desplegable de detalle eliminando: Grupo, ID caducidad, Origen política, Nota política, Días de caducidad y Vida útil al entrar.
@@ -7,7 +7,7 @@
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Novedades v3.4
+## Novedades v3.5
 
 - Se simplifican las secciones visibles a:
   - Resumen
@@ -112,3 +112,8 @@ Después hacer redeploy en Vercel o esperar a que Vercel despliegue automáticam
 Framework Preset: **Other**
 
 Sin build command, sin `package.json` y sin `vercel.json`.
+
+
+## Cambios v3.5
+- Eliminado del desplegable de detalle el campo **Nº última entrada compra**.
+- Se mantiene el resto de funcionalidades de v3.4.

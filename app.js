@@ -965,7 +965,6 @@ function lotDetailFields(r) {
     ['Entrada', fmtDate(r.entryDate)],
     ['Nº entrada', r.entryDoc],
     ['Última compra', fmtDate(r.lastPurchaseDate)],
-    ['Nº última entrada compra', r.lastPurchaseDoc],
     ['Último cliente artículo', r.lastArticleClient],
     ['Fecha último albarán artículo', fmtDate(r.lastArticleSaleDate)],
     ['Nº último albarán artículo', r.lastArticleSaleDoc],
