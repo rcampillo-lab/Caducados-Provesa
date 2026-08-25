@@ -16,6 +16,10 @@
           <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" />
           Cargar Excel SAP
         </label>
+        <label class="upload-btn policy-upload">
+          <input id="policyInput" type="file" accept=".xlsx,.xls,.csv" />
+          Cargar políticas
+        </label>
         <button id="exportBtn" class="secondary" disabled>Exportar vista</button>
       </div>
     </header>
@@ -47,6 +51,17 @@
         <label>
           Proveedor
           <select id="supplierFilter"><option value="all">Todos</option></select>
+        </label>
+        <label>
+          Política
+          <select id="policyFilter">
+            <option value="all">Todas</option>
+            <option value="En política">En política</option>
+            <option value="Fuera de política">Fuera de política</option>
+            <option value="No acepta devolución">No acepta devolución</option>
+            <option value="Sin fecha entrada">Sin fecha entrada</option>
+            <option value="Sin política definida">Sin política definida</option>
+          </select>
         </label>
         <label>
           Tipo artículo

@@ -1,82 +1,41 @@
-# Caducados PROVESA v2.7 — Other / estática pura
+# Caducados PROVESA v2.8
 
-App informativa para cargar el Excel de SAP generado por la query de caducados y analizar stock por artículo, lote, almacén, fecha de entrada real y caducidad.
+App estática tipo **Other** para Vercel/GitHub.
 
-## Enfoque
+## Novedades v2.8
 
-- Sin políticas de caducidad.
-- Sin reglas de devolución.
-- Sin registro de acciones.
-- Solo lectura y análisis del Excel cargado.
-- Pensada para desplegar en Vercel como **Other**.
+- Añade carga de políticas de caducidad por proveedor.
+- Incluye por defecto `assets/politicas-caducidad-proveedores.xlsx`.
+- Permite cargar manualmente otro Excel de políticas con el botón **Cargar políticas**.
+- Calcula una nueva columna: **Política caducidad**.
+- Añade filtro por política.
+- Mantiene el formato de artículo como texto, por ejemplo `000026`.
 
-## Archivos
+## Lógica de política
 
-- `index.html`
-- `styles.css`
-- `app.js`
-- `README.md`
+La app cruza por la columna **Proveedor entrada**.
 
-No lleva `package.json`, `vite.config.js`, `vercel.json`, `src` ni `node_modules`.
+Interpretación del Excel de políticas:
 
-## Despliegue en Vercel
+- `365` = se considera en política si entró con menos de 365 días de vida útil.
+- `270` = se considera en política si entró con menos de 270 días.
+- `181` = se considera en política si entró con menos de 181 días.
+- `0` en la columna **Política** = proveedor no acepta devolución.
+- `0` en la columna **Política frio** = sin política especial de frío; se usa la política general.
 
-1. Crear repositorio en GitHub.
-2. Subir estos archivos directamente a la raíz del repositorio.
-3. Importar en Vercel.
-4. Framework Preset: **Other**.
-5. Build Command: vacío.
-6. Output Directory: vacío o `.`.
-7. Install Command: vacío.
+Si un proveedor no aparece en el Excel, se aplica la norma general de 365 días.
 
 ## Uso
 
-1. Abrir la app.
-2. Pulsar **Cargar Excel SAP**.
-3. Seleccionar el Excel exportado desde SAP.
-4. Usar los filtros por caducidad, tiempo en PROVESA, grupo, tipo artículo, frío, almacén y búsqueda.
-5. Exportar la vista filtrada si hace falta trabajar fuera de la app.
+1. Ejecutar la query en SAP.
+2. Exportar el resultado a Excel.
+3. Abrir la app.
+4. Cargar el Excel de SAP.
+5. La app cargará automáticamente las políticas incluidas si está en Vercel.
+6. Si se abre en local y el navegador bloquea la carga automática, usar el botón **Cargar políticas**.
 
+## Despliegue en Vercel
 
-## Cambios v2.7
+Framework Preset: **Other**
 
-- Una línea por `artículo + lote + almacén`.
-- Se elimina la visión de stock total + stock 01 + stock 02.
-- Nueva columna y filtro `Tipo artículo`: Compañía / Producción / Compañía y producción / Sin propiedad.
-- Tablas y exportación adaptadas a la nueva query v2.7.
-
-
-## Cambios v2.7
-
-- El Excel de “Exportar vista” se ha depurado para uso externo.
-- La exportación elimina grupo, tipo, frío, almacén, días hasta caducidad, días en PROVESA, fecha de última compra y datos específicos del último albarán/lote.
-- El nombre del archivo exportado y la pestaña del Excel se generan según los filtros activos.
-
-
-## Cambios v2.7
-
-- Exportación Excel con título en A1, tamaño 16 y negrita.
-- El título del Excel se genera según los filtros activos.
-- Eliminado el filtro de tiempo en PROVESA.
-- Sustituido el filtro de grupo de artículo por filtro de proveedor de entrada.
-- Corregido el filtro de caducidad: al filtrar por ≤ 30/60/90/180/365 días incluye también artículos ya caducados.
-
-
-## Cambios v2.7
-
-- Exportación Excel optimizada para impresión en A4 horizontal.
-- Ajuste a una página de ancho.
-- Márgenes estrechos y columnas compactas.
-- Autofiltro añadido en la tabla exportada.
-
-
-## Cambios v2.7
-
-- Añadida cabecera visual PROVESA para gestión de caducados.
-- Mantiene estructura Other / estática pura, sin build ni package.json.
-
-
-## Cambios v2.7
-
-- Cabecera embebida directamente en `index.html` para evitar problemas de ruta o de subida de la carpeta `assets` en GitHub/Vercel.
-- Se mantiene también la imagen en `assets/` como respaldo.
+Sin build command, sin `package.json` y sin `vercel.json`.
