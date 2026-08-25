@@ -1,8 +1,13 @@
-# Caducados PROVESA v3.3
+# Caducados PROVESA v3.4
+## Cambios v3.4
+
+- Añadida la columna principal **Proveedor entrada** en la tabla de Lotes.
+- Limpiado el desplegable de detalle eliminando: Grupo, ID caducidad, Origen política, Nota política, Días de caducidad y Vida útil al entrar.
+- Se mantienen en el detalle los campos operativos: Tipo, Frío, Entrada, Nº entrada, últimas compras/albaranes y Base política.
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Novedades v3.3
+## Novedades v3.4
 
 - Se simplifican las secciones visibles a:
   - Resumen
@@ -23,18 +28,16 @@ App estática tipo **Other** para Vercel/GitHub.
   - Nota recl.
   - Nº artículo
   - Descripción
-  - Grupo
-  - Tipo
-  - Frío
+  - Proveedor entrada
   - Lote
   - Almacén
   - Stock
   - Caducidad
   - Estado
   - Política
-- Al hacer clic en una línea de **Lotes**, se despliega el detalle con el resto de información.
+- Al hacer clic en una línea de **Lotes**, se despliega el detalle con el resto de información útil.
 - La columna **Entrada real** pasa a mostrarse como **Entrada** dentro del detalle.
-- Se elimina de la tabla principal la columna de proveedor, días de caducidad y días en PROVESA.
+- Se eliminan del detalle: Grupo, ID caducidad, Origen política, Nota política, Días de caducidad y Vida útil al entrar.
 - La cabecera de las tablas queda fija al bajar por el listado.
 
 ## Gestión local
@@ -109,10 +112,3 @@ Después hacer redeploy en Vercel o esperar a que Vercel despliegue automáticam
 Framework Preset: **Other**
 
 Sin build command, sin `package.json` y sin `vercel.json`.
-
-
-## Cambios v3.3
-
-- Añadido un checkbox en la cabecera de la tabla de Lotes.
-- El checkbox de cabecera selecciona o deselecciona todas las líneas visibles con los filtros activos.
-- Se mantiene la lógica anterior de filtros estables y detalle desplegable.

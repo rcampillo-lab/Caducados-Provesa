@@ -948,6 +948,7 @@ function lotColumns() {
     ['Nota recl.', r => currentClaim(r) ? escapeHtml(currentClaim(r).note || '') : ''],
     ['Nº artículo', r => r.item],
     ['Descripción', r => r.desc],
+    ['Proveedor entrada', r => r.supplier],
     ['Lote', r => r.lot],
     ['Almacén', r => r.warehouse],
     ['Stock', r => fmtNum(r.stock, 2), 'num'],
@@ -959,15 +960,10 @@ function lotColumns() {
 
 function lotDetailFields(r) {
   return [
-    ['Grupo', r.group],
     ['Tipo', r.type],
     ['Frío', r.cold],
     ['Entrada', fmtDate(r.entryDate)],
     ['Nº entrada', r.entryDoc],
-    ['Proveedor entrada', r.supplier],
-    ['Días caducidad', r.daysExp === null ? '' : fmtNum(r.daysExp)],
-    ['Días vida útil al entrar', r.daysLife === null ? '' : fmtNum(r.daysLife)],
-    ['Meses vida útil al entrar', r.monthsLife === null ? '' : fmtNum(r.monthsLife, 2)],
     ['Última compra', fmtDate(r.lastPurchaseDate)],
     ['Nº última entrada compra', r.lastPurchaseDoc],
     ['Último cliente artículo', r.lastArticleClient],
@@ -977,9 +973,6 @@ function lotDetailFields(r) {
     ['Fecha último albarán lote', fmtDate(r.lastLotSaleDate)],
     ['Nº último albarán lote', r.lastLotSaleDoc],
     ['Base política', r.policyBasis],
-    ['Nota política', r.policyNote],
-    ['Origen política', r.policySource],
-    ['ID caducidad', r.claimId],
   ];
 }
 
