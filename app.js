@@ -1567,7 +1567,7 @@ function exportProductionOutPolicy() {
     return;
   }
 
-  const data = groupRows(
+  const sortedRows = groupRows(
     rows,
     r => [r.desc, r.lot, toIsoDate(r.exp)].join('|'),
     r => ({
@@ -1579,6 +1579,7 @@ function exportProductionOutPolicy() {
       'Última venta artículo': fmtDate(r.lastArticleSaleDate),
       'Cliente': r.lastArticleClient || '',
       'Acción/respuesta': '',
+      '_sortCaducidad': toIsoDate(r.exp),
       _lastEntryRaw: r.entryDate,
       _lastSaleRaw: r.lastArticleSaleDate,
     }),
@@ -1592,8 +1593,24 @@ function exportProductionOutPolicy() {
       acc._lastSaleRaw = sale;
       acc['Última venta artículo'] = fmtDate(sale);
     }
-  ).map(({ _lastEntryRaw, _lastSaleRaw, ...x }) => x)
-   .sort((a, b) => String(a['Fecha de caducidad']).localeCompare(String(b['Fecha de caducidad']), 'es') || String(a['Descripción']).localeCompare(String(b['Descripción']), 'es'));
+  ).sort((a, b) =>
+    String(a['_sortCaducidad'] || '9999-12-31').localeCompare(String(b['_sortCaducidad'] || '9999-12-31')) ||
+    String(a['Descripción']).localeCompare(String(b['Descripción']), 'es') ||
+    String(a['Lote']).localeCompare(String(b['Lote']), 'es')
+  );
+
+  const columns = ['Descripción', 'Lote', 'Cantidad', 'Fecha de caducidad', 'Última entrada del lote', 'Última venta artículo', 'Cliente', 'Acción/respuesta'];
+  const blankRow = Object.fromEntries(columns.map(col => [col, '']));
+  const data = [];
+  let previousMonth = '';
+
+  for (const row of sortedRows) {
+    const monthKey = String(row['_sortCaducidad'] || '').slice(0, 7);
+    if (previousMonth && monthKey && monthKey !== previousMonth) data.push({ ...blankRow });
+    const { _sortCaducidad, _lastEntryRaw, _lastSaleRaw, ...visibleRow } = row;
+    data.push(visibleRow);
+    if (monthKey) previousMonth = monthKey;
+  }
 
   writeGestionWorkbook(
     `produccion_fuera_politica_almacen_${el('warehouseFilter').value}`,

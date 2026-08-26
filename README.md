@@ -1,4 +1,4 @@
-# Caducados PROVESA v3.10
+# Caducados PROVESA v3.11
 
 App estática tipo **Other** para Vercel/GitHub.
 
@@ -149,3 +149,8 @@ Sin build command, sin `package.json` y sin `vercel.json`.
 - La exportación **Ofertas compañía fuera política** inserta una fila en blanco entre meses de caducidad, manteniendo arriba lo que caduca antes.
 - Política actualizada para **MERCK SHARP & DOHME ANIMAL HEALTH, S.L.**: 272 días para artículos no fríos y 181 días para artículos de frío.
 
+
+
+## v3.11
+- La exportación **Producción fuera política** se ordena por fecha de caducidad ascendente, dejando arriba lo que caduca antes.
+- La exportación **Producción fuera política** inserta una fila en blanco entre meses de caducidad, igual que la exportación de ofertas de compañía.
