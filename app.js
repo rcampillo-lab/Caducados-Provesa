@@ -594,7 +594,55 @@ function setup() {
   document.addEventListener('click', onDocumentClick);
   document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
   render();
-  autoLoadDefaultPolicies();
+  initializeEmbeddedPolicies();
+}
+
+
+function initializeEmbeddedPolicies() {
+  state.policyRules = new Map();
+  state.policyLoaded = true;
+  state.policyFileName = 'Políticas internas v3.22';
+  enrichRowsWithPolicy();
+  applyClaimsToRows();
+  updateStatusCard();
+  if (state.rows.length) applyFilters();
+}
+
+function embeddedPolicyRules() {
+  return [
+    {
+      provider: 'FATRO',
+      match: key => key.includes('fatro'),
+      generalPolicy: { kind: 'none', months: null, days: 0 },
+      coldPolicy: { kind: 'none', months: null, days: 0 },
+    },
+    {
+      provider: 'VETNOVA',
+      match: key => key.includes('vetnova'),
+      generalPolicy: { kind: 'none', months: null, days: 0 },
+      coldPolicy: { kind: 'none', months: null, days: 0 },
+    },
+    {
+      provider: 'MERCK SHARP & DOHME ANIMAL HEALTH, S.L.',
+      match: key => (key.includes('merck') && key.includes('dohme')) || key.includes('msd animal'),
+      generalPolicy: { kind: 'months', months: 9, days: policyDaysFromMonths(9) },
+      coldPolicy: { kind: 'months', months: 6, days: policyDaysFromMonths(6) },
+    },
+  ];
+}
+
+function findPolicyRule(provider) {
+  const key = normKey(provider);
+  if (!key) return null;
+
+  const exact = state.policyRules.get(key);
+  if (exact) return exact;
+
+  for (const rule of embeddedPolicyRules()) {
+    if (rule.match(key)) return rule;
+  }
+
+  return null;
 }
 
 
@@ -710,8 +758,8 @@ function formatPolicy(policy) {
 
 function calculatePolicy(row) {
   const supplierKey = normKey(row.supplier);
-  const rule = state.policyRules.get(supplierKey);
-  const source = rule ? 'Política proveedor' : 'Norma general';
+  const rule = findPolicyRule(row.supplier);
+  const source = rule ? 'Política interna' : 'Norma general';
 
   const defaultPolicy = { kind: 'months', months: 12, days: DEFAULT_POLICY_DAYS };
   const generalPolicy = rule ? rule.generalPolicy : defaultPolicy;

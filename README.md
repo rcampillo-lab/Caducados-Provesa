@@ -1,50 +1,31 @@
-# Caducados PROVESA v3.21
+# Caducados PROVESA v3.22
 
-## Cambios v3.21
+## Cambios v3.22
 
-- En el desplegable de Lotes se elimina el campo **Base política**.
-- En su lugar aparece **Política caducidad**.
-- El valor se muestra directamente como:
+- Eliminada la dependencia del Excel de políticas de caducidad.
+- La app aplica políticas internas directamente en el código.
+- Política inicial aplicada:
+  - Todos los proveedores: **Política 12 meses**.
+  - **FATRO**: **Política: No tiene**.
+  - **VETNOVA**: **Política: No tiene**.
+  - **MERCK SHARP & DOHME ANIMAL HEALTH, S.L.**:
+    - Artículos de frío: **Política 6 meses**.
+    - Artículos no frío: **Política 9 meses**.
+- En el desplegable de Lotes se mantiene el campo **Política caducidad** con textos como:
   - `Política: No tiene`
   - `Política: 6 meses`
   - `Política: 9 meses`
   - `Política: 12 meses`
-- Los proveedores sin devolución, como Fatro cuando su política sea `No tiene`, aparecen como `Política: No tiene`.
-- Merck con frío `Sí` aparece como `Política: 6 meses`.
 
+## Base mantenida
 
-App estática tipo **Other** para Vercel/GitHub.
-
-## Cambios v3.20
-
-1. **Políticas de caducidad en meses**
-   - El archivo `assets/politicas-caducidad-proveedores.xlsx` ahora se interpreta en meses.
-   - Ejemplos:
-     - `12` = Política 12 meses.
-     - `9` = Política 9 meses.
-     - `6` = Política 6 meses.
-
-2. **Proveedores sin devolución**
-   - La app interpreta textos como `Sin politica`, `Sin política`, `No tiene`, `No acepta`, `No admite` o `Sin devolución` como:
-     - **No acepta devolución**.
-
-3. **Compatibilidad con archivo anterior**
-   - Si en la columna general aparece `0`, se interpreta como **no acepta devolución**.
-   - Si en la columna de frío aparece `0` o está vacía, se interpreta como **sin política especial de frío**, usando la política general.
-
-4. **Nuevo Excel de políticas incluido**
-   - Sustituido el archivo de políticas por el último aportado por Ramón.
-
-## Base mantenida desde v3.17
-
-- Base política mostrada en meses en el desplegable de Lotes.
-- Títulos en los Excel de gestión.
-- Fechas `dd/mm/aaaa`.
-- Cantidades enteras sin decimales ni coma final.
-- Producción fuera política contemplando almacenes **01 + 02** juntos.
-- Exportaciones ordenadas por caducidad y con fila en blanco entre meses cuando corresponde.
-- Excel preparado para impresión A4 horizontal, una página de ancho y márgenes estrechos.
-- Excel sin autofiltros activados por defecto.
+- La política se calcula contra la entrada real del lote y la fecha de caducidad del lote.
+- Fechas en formato `dd/mm/aaaa`.
+- Cantidades enteras sin decimales.
+- Flujo **Gestionar**.
+- Exportaciones Excel de gestión.
+- Producción fuera de política contempla almacenes **01 + 02** juntos.
+- Excel en A4 horizontal, una página de ancho y sin autofiltros.
 
 ## Estados de gestión
 
@@ -53,17 +34,3 @@ App estática tipo **Other** para Vercel/GitHub.
 - **En oferta**: artículo enviado a oferta/descuento.
 
 La gestión se guarda en el navegador mediante almacenamiento local.
-
-
-## v3.20
-
-- La política de caducidad se calcula contra la compra/entrada del lote (`Fecha entrada real`) y la fecha de caducidad del lote.
-- Ya no depende de la última compra del artículo, que puede pertenecer a otro lote.
-- Si el Excel de SAP trae el campo `Días vida útil al entrar`, solo se usa como respaldo cuando no se puede calcular desde la entrada real del lote.
-
-
-## v3.20
-
-- Corregida política de MERCK SHARP & DOHME ANIMAL HEALTH, S.L.: general 9 meses y frío 6 meses.
-- El desplegable muestra la base como `Política: X meses`.
-- La política se sigue calculando contra la fecha de entrada real del lote.
