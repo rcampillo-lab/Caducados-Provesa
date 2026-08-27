@@ -1503,19 +1503,25 @@ function exportExpiredOutPolicy() {
 
   const data = groupRows(
     rows,
-    r => [r.item, r.desc, r.lot].join('|'),
+    r => [r.item, r.desc, r.lot, toIsoDate(r.exp)].join('|'),
     r => ({
       'Nº artículo': r.item,
       'Descripción': r.desc,
       'Cantidad': r.stock,
       'Lote': r.lot,
+      'Caducidad': fmtDate(r.exp),
+      '_sortCaducidad': toIsoDate(r.exp),
     }),
     (acc, r) => { acc['Cantidad'] += r.stock; }
-  ).sort((a, b) => String(a['Nº artículo']).localeCompare(String(b['Nº artículo']), 'es') || String(a['Lote']).localeCompare(String(b['Lote']), 'es'));
+  ).sort((a, b) =>
+    String(a['_sortCaducidad'] || '9999-12-31').localeCompare(String(b['_sortCaducidad'] || '9999-12-31')) ||
+    String(a['Nº artículo']).localeCompare(String(b['Nº artículo']), 'es') ||
+    String(a['Lote']).localeCompare(String(b['Lote']), 'es')
+  ).map(({ _sortCaducidad, ...row }) => row);
 
   writeGestionWorkbook(
     `caducados_fuera_politica_almacen_${el('warehouseFilter').value}`,
-    [{ name: 'Caducados fuera política', data, widths: [12, 46, 12, 18] }]
+    [{ name: 'Caducados fuera política', kind: 'expiredOutPolicy', data, widths: [12, 46, 12, 18, 14] }]
   );
 }
 
@@ -1538,18 +1544,24 @@ function exportExpiredInPolicyBySupplier() {
     .map(([supplier, supplierRows]) => {
       const data = groupRows(
         supplierRows,
-        r => [r.item, r.desc, r.lot, r.entryDoc, toIsoDate(r.entryDate)].join('|'),
+        r => [r.item, r.desc, r.lot, toIsoDate(r.exp), r.entryDoc, toIsoDate(r.entryDate)].join('|'),
         r => ({
           'Nº artículo': r.item,
           'Descripción': r.desc,
           'Cantidad': r.stock,
           'Lote': r.lot,
+          'Caducidad': fmtDate(r.exp),
           'Albarán de compra': r.entryDoc,
           'Fecha de compra': fmtDate(r.entryDate),
+          '_sortCaducidad': toIsoDate(r.exp),
         }),
         (acc, r) => { acc['Cantidad'] += r.stock; }
-      ).sort((a, b) => String(a['Nº artículo']).localeCompare(String(b['Nº artículo']), 'es') || String(a['Lote']).localeCompare(String(b['Lote']), 'es'));
-      return { name: supplier, data, widths: [12, 46, 12, 18, 18, 16] };
+      ).sort((a, b) =>
+        String(a['_sortCaducidad'] || '9999-12-31').localeCompare(String(b['_sortCaducidad'] || '9999-12-31')) ||
+        String(a['Nº artículo']).localeCompare(String(b['Nº artículo']), 'es') ||
+        String(a['Lote']).localeCompare(String(b['Lote']), 'es')
+      ).map(({ _sortCaducidad, ...row }) => row);
+      return { name: supplier, kind: 'expiredInPolicy', titleSupplier: supplier, data, widths: [12, 46, 12, 18, 14, 18, 16] };
     });
 
   writeGestionWorkbook(`caducados_en_politica_almacen_${el('warehouseFilter').value}`, sheets);
@@ -1596,7 +1608,7 @@ function exportPetOutPolicyOffers() {
 
   writeGestionWorkbook(
     `ofertas_compania_fuera_politica_almacen_${el('warehouseFilter').value}`,
-    [{ name: 'Ofertas compañía', data, widths: [12, 46, 12, 18, 18, 14] }]
+    [{ name: 'Ofertas compañía', kind: 'petOutPolicy', data, widths: [12, 46, 12, 18, 18, 14] }]
   );
 }
 
@@ -1612,8 +1624,8 @@ function exportProductionOutPolicy() {
     r => [r.desc, r.lot, toIsoDate(r.exp)].join('|'),
     r => ({
       'Descripción': r.desc,
-      'Lote': r.lot,
       'Cantidad': r.stock,
+      'Lote': r.lot,
       'Caducidad': fmtDate(r.exp),
       'Última entrada': fmtDate(r.lastPurchaseDate),
       'Última venta': fmtDate(r.lastArticleSaleDate),
@@ -1639,7 +1651,7 @@ function exportProductionOutPolicy() {
     String(a['Lote']).localeCompare(String(b['Lote']), 'es')
   );
 
-  const columns = ['Descripción', 'Lote', 'Cantidad', 'Caducidad', 'Última entrada', 'Última venta', 'Cliente', 'Acción/respuesta'];
+  const columns = ['Descripción', 'Cantidad', 'Lote', 'Caducidad', 'Última entrada', 'Última venta', 'Cliente', 'Acción/respuesta'];
   const blankRow = Object.fromEntries(columns.map(col => [col, '']));
   const data = [];
   let previousMonth = '';
@@ -1654,7 +1666,7 @@ function exportProductionOutPolicy() {
 
   writeGestionWorkbook(
     'produccion_fuera_politica_almacenes_01_02',
-    [{ name: 'Producción fuera política', data, widths: [38, 14, 10, 14, 17, 17, 28, 24] }]
+    [{ name: 'Producción fuera política', kind: 'productionOutPolicy', data, widths: [38, 10, 14, 14, 17, 17, 28, 24] }]
   );
 }
 
@@ -1664,8 +1676,10 @@ function writeGestionWorkbook(fileBaseName, sheets) {
 
   for (const sheet of sheets) {
     if (!sheet.data.length) continue;
-    const ws = XLSX.utils.json_to_sheet(sheet.data);
-    applyGestionSheetFormat(ws, sheet.data, sheet.widths || []);
+    const title = makeGestionExportTitle(sheet.kind, sheet.titleSupplier);
+    const ws = XLSX.utils.aoa_to_sheet([[title], []]);
+    XLSX.utils.sheet_add_json(ws, sheet.data, { origin: 'A3' });
+    applyGestionSheetFormat(ws, sheet.data, sheet.widths || [], title);
     const sheetName = uniqueSheetName(sheet.name || 'Hoja', usedNames);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   }
@@ -1675,7 +1689,6 @@ function writeGestionWorkbook(fileBaseName, sheets) {
     return;
   }
 
-  const wh = el('warehouseFilter').value;
   const suffix = activeFilterParts()
     .filter(part => !part.toLowerCase().includes('almacen'))
     .join('_');
@@ -1683,11 +1696,41 @@ function writeGestionWorkbook(fileBaseName, sheets) {
   XLSX.writeFile(wb, `${finalName}.xlsx`);
 }
 
-function applyGestionSheetFormat(ws, data, widths) {
+function makeGestionExportTitle(kind, supplierOverride = '') {
+  const filters = getFilterValues();
+  const parts = [];
+
+  if (kind === 'expiredOutPolicy' || kind === 'expiredInPolicy') parts.push('Caducados actuales');
+  else if (kind === 'petOutPolicy' || kind === 'productionOutPolicy') parts.push('6 meses completos');
+  else {
+    if (filters.expiry === 'expired') parts.push('Caducados actuales');
+    else if (filters.expiry !== 'all') parts.push(`${filters.expiry} mes${filters.expiry === '1' ? '' : 'es'} completo${filters.expiry === '1' ? '' : 's'}`);
+  }
+
+  if (kind === 'expiredOutPolicy' || kind === 'petOutPolicy' || kind === 'productionOutPolicy') parts.push('Fuera de política');
+  else if (kind === 'expiredInPolicy') parts.push('En política');
+  else if (filters.policy !== 'all') parts.push(filters.policy);
+
+  const supplier = supplierOverride || (filters.supplier !== 'all' ? filters.supplier : '');
+  if (supplier) parts.push(supplier);
+
+  if (kind === 'petOutPolicy') parts.push('Compañía');
+  else if (kind === 'productionOutPolicy') parts.push('Producción');
+  else if (filters.type !== 'all') parts.push(filters.type);
+
+  if (kind === 'productionOutPolicy') parts.push('Almacén 01+02');
+  else if (filters.wh !== 'all') parts.push(`Almacén ${filters.wh}`);
+
+  return parts.length ? parts.join(' - ') : 'Caducados PROVESA';
+}
+
+function applyGestionSheetFormat(ws, data, widths, title = '') {
   const columns = Object.keys(data[0] || {});
+  const lastCol = Math.max(columns.length - 1, 0);
   ws['!cols'] = columns.map((_, i) => ({ wch: widths[i] || 16 }));
-  ws['!rows'] = [{ hpt: 22 }];
-  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+  ws['!rows'] = [{ hpt: 24 }, { hpt: 6 }, { hpt: 22 }];
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }];
+  ws['!freeze'] = { xSplit: 0, ySplit: 3 };
   ws['!margins'] = {
     left: 0.25,
     right: 0.25,
@@ -1705,8 +1748,16 @@ function applyGestionSheetFormat(ws, data, widths) {
     horizontalCentered: true,
     scale: 90
   };
+
+  if (ws.A1) {
+    ws.A1.s = {
+      font: { bold: true, sz: 16, color: { rgb: '1F2937' } },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    };
+  }
+
   for (let c = 0; c < columns.length; c += 1) {
-    const ref = `${columnLetter(c)}1`;
+    const ref = `${columnLetter(c)}3`;
     if (!ws[ref]) continue;
     ws[ref].s = {
       font: { bold: true, color: { rgb: 'FFFFFF' } },
@@ -1718,7 +1769,7 @@ function applyGestionSheetFormat(ws, data, widths) {
   const quantityIndex = columns.findIndex(col => normKey(col) === 'cantidad');
   if (quantityIndex >= 0) {
     const quantityCol = columnLetter(quantityIndex);
-    for (let r = 2; r <= data.length + 1; r += 1) {
+    for (let r = 4; r <= data.length + 3; r += 1) {
       const ref = `${quantityCol}${r}`;
       if (!ws[ref]) continue;
       const rawValue = ws[ref].v;
