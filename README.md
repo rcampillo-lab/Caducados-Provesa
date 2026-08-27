@@ -1,6 +1,20 @@
-# Caducados PROVESA v3.14
+# Caducados PROVESA v3.15
 
 App estática tipo **Other** para Vercel/GitHub.
+
+
+## Cambios v3.15
+
+1. **Fechas con formato fijo**
+   - Todas las fechas de la app y de los Excel exportados se muestran como `dd/mm/aaaa`.
+   - Ejemplo: `01/01/2026`, no `1/1/2026`.
+
+2. **Cantidad sin coma final**
+   - En los Excel, la columna **Cantidad** muestra enteros sin decimales ni coma final.
+   - Ejemplo: `2`, no `2,`.
+   - Si una cantidad tiene decimales reales, se conservan.
+
+## Base mantenida desde v3.14
 
 ## Cambios v3.14
 

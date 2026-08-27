@@ -159,7 +159,11 @@ function parseDate(v) {
 
 function fmtDate(v) {
   const d = parseDate(v);
-  return d ? d.toLocaleDateString('es-ES') : '';
+  if (!d) return '';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 function diffDays(a, b) {
@@ -434,12 +438,12 @@ function exportClaims() {
     .map(c => ({
       'Estado gestión': normalizeGestionStatus(c.status),
       'Nota gestión': c.note || '',
-      'Fecha gestión': c.updatedAt ? new Date(c.updatedAt).toLocaleString('es-ES') : '',
+      'Fecha gestión': c.updatedAt ? fmtDate(c.updatedAt) : '',
       'Nº artículo': c.item || '',
       'Descripción artículo': c.desc || '',
       'Lote': c.lot || '',
       'Almacén': c.warehouse || '',
-      'Fecha caducidad': c.exp || '',
+      'Fecha caducidad': fmtDate(c.exp),
       'Stock al marcar': c.stock || 0,
       'Proveedor entrada': c.supplier || '',
       'Nº entrada mercancía': c.entryDoc || '',
@@ -1717,11 +1721,21 @@ function applyGestionSheetFormat(ws, data, widths) {
     for (let r = 2; r <= data.length + 1; r += 1) {
       const ref = `${quantityCol}${r}`;
       if (!ws[ref]) continue;
-      ws[ref].s = {
+      const rawValue = ws[ref].v;
+      const isBlank = rawValue === undefined || rawValue === null || String(rawValue).trim() === '';
+      const numericValue = isBlank ? null : parseNumber(rawValue);
+      const isNumber = numericValue !== null && Number.isFinite(numericValue);
+      if (isNumber) {
+        ws[ref].t = 'n';
+        ws[ref].v = numericValue;
+      }
+      const isInteger = isNumber && Math.abs(numericValue - Math.round(numericValue)) < 0.000001;
+      const style = {
         ...(ws[ref].s || {}),
-        alignment: { horizontal: 'center', vertical: 'center' },
-        numFmt: '0.##'
+        alignment: { horizontal: 'center', vertical: 'center' }
       };
+      if (!isBlank) style.numFmt = isInteger ? '0' : '0.###';
+      ws[ref].s = style;
     }
   }
 }
