@@ -1,24 +1,27 @@
-# Caducados PROVESA v3.13
+# Caducados PROVESA v3.14
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Cambios v3.13
+## Cambios v3.14
 
-1. **Flujo Gestionar — producción fuera de política conjunta**
-   - El paso de **producción fuera de política próximos 6 meses** se gestiona una sola vez contemplando los almacenes **01 y 02 juntos**.
-   - Ya no se repite por separado en almacén 01 y almacén 02.
-   - En el flujo guiado, tras producción conjunta se pasa al almacén 02 para continuar con el resto de gestiones.
+1. **Cabeceras de Excel simplificadas**
+   - En exportaciones con fecha de caducidad, la columna pasa de **Fecha de caducidad** a **Caducidad**.
+   - En **Producción fuera política**, la columna **Última entrada del artículo** pasa a **Última entrada**.
+   - En **Producción fuera política**, la columna **Última venta artículo** pasa a **Última venta**.
 
-2. **Exportación Producción fuera política**
-   - Incluye almacenes **01 + 02** en un único Excel.
-   - Ordena por **fecha de caducidad ascendente**.
-   - Inserta una fila en blanco entre meses.
-   - Sustituye la columna **Última entrada del lote** por **Última entrada del artículo**.
+2. **Cantidad centrada**
+   - En los Excel de gestión, la columna **Cantidad** queda alineada al centro.
+   - Se mantiene formato numérico compacto: enteros sin decimales y decimales solo cuando existan.
 
-3. **Impresión Excel**
-   - Exportaciones de gestión configuradas para impresión en **A4 horizontal**.
-   - Ajuste a una página de ancho.
-   - Márgenes estrechos y columnas compactas.
+3. **Sin filtros automáticos en Excel**
+   - Los Excel exportados ya no aparecen con autofiltros activados por defecto.
+   - Se mantiene la congelación de cabecera y la configuración de impresión.
+
+## Base mantenida desde v3.13
+
+- Flujo **Gestionar** con producción fuera de política contemplando almacenes **01 + 02** juntos.
+- Exportación de producción fuera política ordenada por caducidad y con fila en blanco entre meses.
+- Excel preparado para impresión A4 horizontal, una página de ancho y márgenes estrechos.
 
 ## Estados de gestión
 

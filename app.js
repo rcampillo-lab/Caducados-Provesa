@@ -1566,7 +1566,7 @@ function exportPetOutPolicyOffers() {
       'Descripción': r.desc,
       'Cantidad': r.stock,
       'Lote': r.lot,
-      'Fecha de caducidad': fmtDate(r.exp),
+      'Caducidad': fmtDate(r.exp),
       'Descuento': '',
       '_sortCaducidad': toIsoDate(r.exp),
     }),
@@ -1577,7 +1577,7 @@ function exportPetOutPolicyOffers() {
     String(a['Lote']).localeCompare(String(b['Lote']), 'es')
   );
 
-  const columns = ['Nº artículo', 'Descripción', 'Cantidad', 'Lote', 'Fecha de caducidad', 'Descuento'];
+  const columns = ['Nº artículo', 'Descripción', 'Cantidad', 'Lote', 'Caducidad', 'Descuento'];
   const blankRow = Object.fromEntries(columns.map(col => [col, '']));
   const data = [];
   let previousMonth = '';
@@ -1610,9 +1610,9 @@ function exportProductionOutPolicy() {
       'Descripción': r.desc,
       'Lote': r.lot,
       'Cantidad': r.stock,
-      'Fecha de caducidad': fmtDate(r.exp),
-      'Última entrada del artículo': fmtDate(r.lastPurchaseDate),
-      'Última venta artículo': fmtDate(r.lastArticleSaleDate),
+      'Caducidad': fmtDate(r.exp),
+      'Última entrada': fmtDate(r.lastPurchaseDate),
+      'Última venta': fmtDate(r.lastArticleSaleDate),
       'Cliente': r.lastArticleClient || '',
       'Acción/respuesta': '',
       '_sortCaducidad': toIsoDate(r.exp),
@@ -1623,11 +1623,11 @@ function exportProductionOutPolicy() {
       acc['Cantidad'] += r.stock;
       const entry = maxDateValue(acc._lastEntryArticleRaw, r.lastPurchaseDate);
       acc._lastEntryArticleRaw = entry;
-      acc['Última entrada del artículo'] = fmtDate(entry);
+      acc['Última entrada'] = fmtDate(entry);
       const sale = maxDateValue(acc._lastSaleRaw, r.lastArticleSaleDate);
       if (toIsoDate(sale) !== toIsoDate(acc._lastSaleRaw)) acc['Cliente'] = r.lastArticleClient || acc['Cliente'];
       acc._lastSaleRaw = sale;
-      acc['Última venta artículo'] = fmtDate(sale);
+      acc['Última venta'] = fmtDate(sale);
     }
   ).sort((a, b) =>
     String(a['_sortCaducidad'] || '9999-12-31').localeCompare(String(b['_sortCaducidad'] || '9999-12-31')) ||
@@ -1635,7 +1635,7 @@ function exportProductionOutPolicy() {
     String(a['Lote']).localeCompare(String(b['Lote']), 'es')
   );
 
-  const columns = ['Descripción', 'Lote', 'Cantidad', 'Fecha de caducidad', 'Última entrada del artículo', 'Última venta artículo', 'Cliente', 'Acción/respuesta'];
+  const columns = ['Descripción', 'Lote', 'Cantidad', 'Caducidad', 'Última entrada', 'Última venta', 'Cliente', 'Acción/respuesta'];
   const blankRow = Object.fromEntries(columns.map(col => [col, '']));
   const data = [];
   let previousMonth = '';
@@ -1684,10 +1684,6 @@ function applyGestionSheetFormat(ws, data, widths) {
   ws['!cols'] = columns.map((_, i) => ({ wch: widths[i] || 16 }));
   ws['!rows'] = [{ hpt: 22 }];
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  if (columns.length) {
-    const lastCol = columnLetter(columns.length - 1);
-    ws['!autofilter'] = { ref: `A1:${lastCol}${Math.max(1, data.length + 1)}` };
-  }
   ws['!margins'] = {
     left: 0.25,
     right: 0.25,
@@ -1713,6 +1709,20 @@ function applyGestionSheetFormat(ws, data, widths) {
       fill: { fgColor: { rgb: '1767C2' } },
       alignment: { horizontal: 'center', vertical: 'center' }
     };
+  }
+
+  const quantityIndex = columns.findIndex(col => normKey(col) === 'cantidad');
+  if (quantityIndex >= 0) {
+    const quantityCol = columnLetter(quantityIndex);
+    for (let r = 2; r <= data.length + 1; r += 1) {
+      const ref = `${quantityCol}${r}`;
+      if (!ws[ref]) continue;
+      ws[ref].s = {
+        ...(ws[ref].s || {}),
+        alignment: { horizontal: 'center', vertical: 'center' },
+        numFmt: '0.##'
+      };
+    }
   }
 }
 
@@ -1798,7 +1808,6 @@ function exportView() {
     fitToHeight: 0,
     horizontalCentered: true
   };
-  ws['!autofilter'] = { ref: `A3:M${Math.max(3, data.length + 3)}` };
   ws['!freeze'] = { xSplit: 0, ySplit: 3 };
 
   const wb = XLSX.utils.book_new();
