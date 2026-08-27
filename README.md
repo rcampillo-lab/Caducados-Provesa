@@ -1,4 +1,17 @@
-# Caducados PROVESA v3.20
+# Caducados PROVESA v3.21
+
+## Cambios v3.21
+
+- En el desplegable de Lotes se elimina el campo **Base política**.
+- En su lugar aparece **Política caducidad**.
+- El valor se muestra directamente como:
+  - `Política: No tiene`
+  - `Política: 6 meses`
+  - `Política: 9 meses`
+  - `Política: 12 meses`
+- Los proveedores sin devolución, como Fatro cuando su política sea `No tiene`, aparecen como `Política: No tiene`.
+- Merck con frío `Sí` aparece como `Política: 6 meses`.
+
 
 App estática tipo **Other** para Vercel/GitHub.
 

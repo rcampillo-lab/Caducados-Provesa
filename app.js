@@ -702,9 +702,9 @@ function parsePolicyCell(value, columnType) {
 }
 
 function formatPolicy(policy) {
-  if (!policy || policy.kind === 'none') return 'Sin devolución';
+  if (!policy || policy.kind === 'none') return 'Política: No tiene';
   const months = policy.months || policyMonthsFromDays(policy.days);
-  if (!months) return 'Sin devolución';
+  if (!months) return 'Política: No tiene';
   return `Política: ${months} ${months === 1 ? 'mes' : 'meses'}`;
 }
 
@@ -722,7 +722,7 @@ function calculatePolicy(row) {
     return {
       policyStatus: 'No acepta devolución',
       policyThresholdDays: 0,
-      policyBasis: 'Sin devolución',
+      policyBasis: 'Política: No tiene',
       policyNote: 'Proveedor marcado como no acepta devolución',
       policySource: source,
     };
@@ -1115,7 +1115,7 @@ function lotDetailFields(r) {
     ['Último cliente lote', r.lastLotClient],
     ['Fecha último albarán lote', fmtDate(r.lastLotSaleDate)],
     ['Nº último albarán lote', r.lastLotSaleDoc],
-    ['Base política', r.policyBasis],
+    ['Política caducidad', r.policyBasis],
   ];
 }
 
