@@ -1,8 +1,8 @@
-# Caducados PROVESA v3.18
+# Caducados PROVESA v3.19
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Cambios v3.18
+## Cambios v3.19
 
 1. **Políticas de caducidad en meses**
    - El archivo `assets/politicas-caducidad-proveedores.xlsx` ahora se interpreta en meses.
@@ -40,3 +40,10 @@ App estática tipo **Other** para Vercel/GitHub.
 - **En oferta**: artículo enviado a oferta/descuento.
 
 La gestión se guarda en el navegador mediante almacenamiento local.
+
+
+## v3.19
+
+- La política de caducidad se calcula contra la compra/entrada del lote (`Fecha entrada real`) y la fecha de caducidad del lote.
+- Ya no depende de la última compra del artículo, que puede pertenecer a otro lote.
+- Si el Excel de SAP trae el campo `Días vida útil al entrar`, solo se usa como respaldo cuando no se puede calcular desde la entrada real del lote.

@@ -499,6 +499,7 @@ function mapRow(row) {
   const monthsLifeRaw = get(row, COLS.monthsLife);
   const calculatedDaysExp = diffDays(new Date(), exp);
   const daysExp = calculatedDaysExp !== null ? calculatedDaysExp : (daysExpRaw !== '' ? parseNumber(daysExpRaw) : null);
+  const daysLifeFromLotPurchase = diffDays(entry, exp);
   const daysInProvesa = daysFrom(entry);
   const cold = norm(get(row, COLS.cold));
   return {
@@ -518,8 +519,8 @@ function mapRow(row) {
     entryDoc: norm(get(row, COLS.entryDoc)),
     supplier: norm(get(row, COLS.supplier)) || 'Sin proveedor',
     entryWarehouse: norm(get(row, COLS.entryWarehouse)),
-    daysLife: daysLifeRaw !== '' ? parseNumber(daysLifeRaw) : null,
-    monthsLife: monthsLifeRaw !== '' ? parseNumber(monthsLifeRaw) : null,
+    daysLife: daysLifeFromLotPurchase !== null ? daysLifeFromLotPurchase : (daysLifeRaw !== '' ? parseNumber(daysLifeRaw) : null),
+    monthsLife: daysLifeFromLotPurchase !== null ? Number((daysLifeFromLotPurchase / 30.4375).toFixed(2)) : (monthsLifeRaw !== '' ? parseNumber(monthsLifeRaw) : null),
     lastPurchaseDate: get(row, COLS.lastPurchaseDate),
     lastPurchaseDoc: norm(get(row, COLS.lastPurchaseDoc)),
     lastArticleSaleDate: get(row, COLS.lastArticleSaleDate),
@@ -735,7 +736,7 @@ function calculatePolicy(row) {
       policyStatus: 'Sin fecha entrada',
       policyThresholdDays: threshold,
       policyBasis: basis,
-      policyNote: 'No hay fecha de entrada real o vida útil al entrar',
+      policyNote: 'No hay fecha de compra/entrada del lote para comparar con caducidad',
       policySource: source,
     };
   }
@@ -745,7 +746,7 @@ function calculatePolicy(row) {
     policyStatus: status,
     policyThresholdDays: threshold,
     policyBasis: basis,
-    policyNote: `${Number(row.daysLife).toLocaleString('es-ES')} días de vida útil al entrar vs umbral ${threshold}`,
+    policyNote: `${Number(row.daysLife).toLocaleString('es-ES')} días entre compra del lote y caducidad vs política ${threshold} días`,
     policySource: source,
   };
 }
