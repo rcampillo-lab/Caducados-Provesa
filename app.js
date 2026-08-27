@@ -643,6 +643,22 @@ function enrichRowsWithPolicy() {
   state.rows.forEach(row => Object.assign(row, calculatePolicy(row)));
 }
 
+
+function policyMonthsFromDays(days) {
+  const n = Number(days);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n >= 360 && n <= 366) return 12;
+  if (n >= 265 && n <= 276) return 9;
+  if (n >= 175 && n <= 186) return 6;
+  return Math.max(1, Math.round(n / 30.4375));
+}
+
+function formatPolicyMonths(days) {
+  const months = policyMonthsFromDays(days);
+  if (!months) return 'Sin devolución';
+  return `Política ${months} ${months === 1 ? 'mes' : 'meses'}`;
+}
+
 function calculatePolicy(row) {
   const supplierKey = normKey(row.supplier);
   const rule = state.policyRules.get(supplierKey);
@@ -662,7 +678,7 @@ function calculatePolicy(row) {
 
   const coldApplies = isCold(row.cold) && coldDays > 0;
   const threshold = coldApplies ? coldDays : generalDays;
-  const basis = coldApplies ? `Frío: ${threshold} días` : `General: ${threshold} días`;
+  const basis = formatPolicyMonths(threshold);
 
   if (row.daysLife === null || row.daysLife === undefined || !Number.isFinite(Number(row.daysLife))) {
     return {

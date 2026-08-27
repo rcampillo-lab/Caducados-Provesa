@@ -1,6 +1,13 @@
-# Caducados PROVESA v3.16
+# Caducados PROVESA v3.17
 
 App estática tipo **Other** para Vercel/GitHub.
+
+## Cambios v3.17
+
+1. **Base política en meses**
+   - El desplegable de Lotes ya no muestra textos como `General: 365 días`.
+   - Ahora muestra la política de caducidad en meses, por ejemplo `Política 12 meses`, `Política 9 meses` o `Política 6 meses`.
+   - Para Merck frío, se muestra `Política 6 meses`; para Merck no frío, `Política 9 meses`.
 
 ## Cambios v3.16
 
