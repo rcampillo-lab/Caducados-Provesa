@@ -89,8 +89,8 @@ const MANAGEMENT_STEPS = {
     typeKind: 'production',
     targetStatus: 'En trámite',
     note: 'Flujo Gestionar: producción fuera de política - revisar acción',
-    exportLabel: 'Producción fuera política',
-    detail: 'Exporta el listado de producción fuera de política, revisa las acciones y después avanza de almacén o finaliza.',
+    exportLabel: 'Producción fuera política almacenes 01+02',
+    detail: 'Exporta el listado de producción fuera de política de los almacenes 01 y 02 juntos, revisa las acciones y después pasa al almacén 2 o finaliza.',
   },
 };
 
@@ -1141,6 +1141,19 @@ function currentManagementWarehouse() {
   return resolveWarehouseValue(target);
 }
 
+function currentManagementWarehouseLabel(stepKey = currentManagementStepKey()) {
+  if (stepKey === 'productionOutPolicy') return '01 + 02';
+  return currentManagementWarehouse();
+}
+
+function stepUsesCombinedWarehouses(stepKey = currentManagementStepKey()) {
+  return stepKey === 'productionOutPolicy';
+}
+
+function shouldSkipCurrentManagementStep() {
+  return currentManagementStepKey() === 'productionOutPolicy' && state.manageFlow.warehouseIndex > 0;
+}
+
 function resolveWarehouseValue(target) {
   const values = [...new Set(state.rows.map(r => r.warehouse).filter(Boolean))];
   const candidates = target === '01' ? ['01', '1', '001'] : ['02', '2', '002'];
@@ -1188,6 +1201,14 @@ function applyCurrentManagementStep() {
     return;
   }
 
+  if (shouldSkipCurrentManagementStep()) {
+    state.manageFlow.stepIndex += 1;
+    state.manageFlow.providers = [];
+    state.manageFlow.providerIndex = 0;
+    applyCurrentManagementStep();
+    return;
+  }
+
   const warehouse = currentManagementWarehouse();
 
   if (stepKey === 'expiredInPolicy') {
@@ -1217,7 +1238,9 @@ function applyCurrentManagementStep() {
   ensureSelectOption('claimFilter', 'pending', 'Pendientes');
   ensureSelectOption('typeFilter', typeValue, typeValue === 'all' ? 'Todos' : typeValue);
   ensureSelectOption('coldFilter', 'all', 'Todos');
-  ensureSelectOption('warehouseFilter', warehouse, `Almacén ${warehouse}`);
+  const warehouseFilterValue = stepUsesCombinedWarehouses(stepKey) ? 'all' : warehouse;
+  const warehouseFilterLabel = stepUsesCombinedWarehouses(stepKey) ? 'Todos' : `Almacén ${warehouse}`;
+  ensureSelectOption('warehouseFilter', warehouseFilterValue, warehouseFilterLabel);
   ensureSelectOption('sortFilter', 'expiry', 'Caducidad próxima');
 
   state.selectedClaimIds.clear();
@@ -1250,6 +1273,11 @@ function advanceManagementFlow() {
       applyCurrentManagementStep();
       return;
     }
+    finishManagementFlow();
+    return;
+  }
+
+  if (shouldSkipCurrentManagementStep()) {
     finishManagementFlow();
     return;
   }
@@ -1292,7 +1320,7 @@ function finishManagementFlow() {
   state.manageFlow = { active: false, warehouseIndex: 0, stepIndex: 0, providers: [], providerIndex: 0 };
   updateManagementFlowUi();
   applyFilters();
-  alert('Gestión guiada finalizada. Se han recorrido almacén 01 y almacén 02.');
+  alert('Gestión guiada finalizada. Se han recorrido almacén 01, almacén 02 y producción fuera de política conjunta para ambos almacenes.');
 }
 
 function updateManagementFlowUi() {
@@ -1315,7 +1343,7 @@ function updateManagementFlowUi() {
 
   const stepKey = currentManagementStepKey();
   const step = currentManagementStep();
-  const warehouse = currentManagementWarehouse();
+  const warehouse = currentManagementWarehouseLabel(stepKey);
   const supplier = stepKey === 'expiredInPolicy'
     ? (state.manageFlow.providers[state.manageFlow.providerIndex] || '')
     : '';
@@ -1326,14 +1354,15 @@ function updateManagementFlowUi() {
 
   const isLastStep = state.manageFlow.stepIndex === MANAGEMENT_STEP_ORDER.length - 1;
   const isWarehouseOne = state.manageFlow.warehouseIndex === 0;
+  const isFinalEffectiveStep = !isWarehouseOne && stepKey === 'petOutPolicy';
 
-  if (isLastStep && isWarehouseOne) button.textContent = 'Pasar a almacén 2';
-  else if (isLastStep && !isWarehouseOne) button.textContent = 'Finalizar gestión';
+  if (stepKey === 'productionOutPolicy' && isWarehouseOne) button.textContent = 'Pasar a almacén 2';
+  else if ((isLastStep && !isWarehouseOne) || isFinalEffectiveStep) button.textContent = 'Finalizar gestión';
   else button.textContent = 'Siguiente';
 
   if (box && title && text && step) {
     box.hidden = false;
-    title.textContent = `Almacén ${warehouse} · ${step.title}${supplier ? ' · ' + supplier : ''}`;
+    title.textContent = `${stepKey === 'productionOutPolicy' ? 'Almacenes' : 'Almacén'} ${warehouse} · ${step.title}${supplier ? ' · ' + supplier : ''}`;
     text.innerHTML = `${escapeHtml(step.detail)}<br><strong>${count.toLocaleString('es-ES')}</strong> línea${count === 1 ? '' : 's'} pendiente${count === 1 ? '' : 's'} en este paso${providerPosition}. Exportación recomendada: <strong>${escapeHtml(step.exportLabel)}</strong>. Al pulsar <strong>${escapeHtml(button.textContent)}</strong>, las líneas pendientes visibles pasarán a <strong>${escapeHtml(step.targetStatus)}</strong>.`;
   }
 }
@@ -1404,7 +1433,7 @@ function rowMatchesExportBaseFilters(row, ignore = {}) {
 }
 
 function exportRowsForGestion(kind) {
-  if (!requireWarehouseForGestionExport()) return [];
+  if (kind !== 'productionOutPolicy' && !requireWarehouseForGestionExport()) return [];
 
   if (kind === 'expiredOutPolicy') {
     return state.rows.filter(row =>
@@ -1433,7 +1462,7 @@ function exportRowsForGestion(kind) {
 
   if (kind === 'productionOutPolicy') {
     return state.rows.filter(row =>
-      rowMatchesExportBaseFilters(row, { policy: true, type: true }) &&
+      rowMatchesExportBaseFilters(row, { policy: true, type: true, warehouse: true }) &&
       isNotExpired(row) &&
       isOutOfPolicy(row) &&
       isProductionType(row)
@@ -1582,19 +1611,19 @@ function exportProductionOutPolicy() {
       'Lote': r.lot,
       'Cantidad': r.stock,
       'Fecha de caducidad': fmtDate(r.exp),
-      'Última entrada del lote': fmtDate(r.entryDate),
+      'Última entrada del artículo': fmtDate(r.lastPurchaseDate),
       'Última venta artículo': fmtDate(r.lastArticleSaleDate),
       'Cliente': r.lastArticleClient || '',
       'Acción/respuesta': '',
       '_sortCaducidad': toIsoDate(r.exp),
-      _lastEntryRaw: r.entryDate,
+      _lastEntryArticleRaw: r.lastPurchaseDate,
       _lastSaleRaw: r.lastArticleSaleDate,
     }),
     (acc, r) => {
       acc['Cantidad'] += r.stock;
-      const entry = maxDateValue(acc._lastEntryRaw, r.entryDate);
-      acc._lastEntryRaw = entry;
-      acc['Última entrada del lote'] = fmtDate(entry);
+      const entry = maxDateValue(acc._lastEntryArticleRaw, r.lastPurchaseDate);
+      acc._lastEntryArticleRaw = entry;
+      acc['Última entrada del artículo'] = fmtDate(entry);
       const sale = maxDateValue(acc._lastSaleRaw, r.lastArticleSaleDate);
       if (toIsoDate(sale) !== toIsoDate(acc._lastSaleRaw)) acc['Cliente'] = r.lastArticleClient || acc['Cliente'];
       acc._lastSaleRaw = sale;
@@ -1606,7 +1635,7 @@ function exportProductionOutPolicy() {
     String(a['Lote']).localeCompare(String(b['Lote']), 'es')
   );
 
-  const columns = ['Descripción', 'Lote', 'Cantidad', 'Fecha de caducidad', 'Última entrada del lote', 'Última venta artículo', 'Cliente', 'Acción/respuesta'];
+  const columns = ['Descripción', 'Lote', 'Cantidad', 'Fecha de caducidad', 'Última entrada del artículo', 'Última venta artículo', 'Cliente', 'Acción/respuesta'];
   const blankRow = Object.fromEntries(columns.map(col => [col, '']));
   const data = [];
   let previousMonth = '';
@@ -1614,14 +1643,14 @@ function exportProductionOutPolicy() {
   for (const row of sortedRows) {
     const monthKey = String(row['_sortCaducidad'] || '').slice(0, 7);
     if (previousMonth && monthKey && monthKey !== previousMonth) data.push({ ...blankRow });
-    const { _sortCaducidad, _lastEntryRaw, _lastSaleRaw, ...visibleRow } = row;
+    const { _sortCaducidad, _lastEntryArticleRaw, _lastSaleRaw, ...visibleRow } = row;
     data.push(visibleRow);
     if (monthKey) previousMonth = monthKey;
   }
 
   writeGestionWorkbook(
-    `produccion_fuera_politica_almacen_${el('warehouseFilter').value}`,
-    [{ name: 'Producción fuera política', data, widths: [46, 18, 12, 18, 18, 18, 34, 26] }]
+    'produccion_fuera_politica_almacenes_01_02',
+    [{ name: 'Producción fuera política', data, widths: [38, 14, 10, 14, 17, 17, 28, 24] }]
   );
 }
 
@@ -1653,6 +1682,7 @@ function writeGestionWorkbook(fileBaseName, sheets) {
 function applyGestionSheetFormat(ws, data, widths) {
   const columns = Object.keys(data[0] || {});
   ws['!cols'] = columns.map((_, i) => ({ wch: widths[i] || 16 }));
+  ws['!rows'] = [{ hpt: 22 }];
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
   if (columns.length) {
     const lastCol = columnLetter(columns.length - 1);
@@ -1672,7 +1702,8 @@ function applyGestionSheetFormat(ws, data, widths) {
     fitToPage: true,
     fitToWidth: 1,
     fitToHeight: 0,
-    horizontalCentered: true
+    horizontalCentered: true,
+    scale: 90
   };
   for (let c = 0; c < columns.length; c += 1) {
     const ref = `${columnLetter(c)}1`;
