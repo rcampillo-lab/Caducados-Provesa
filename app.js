@@ -628,12 +628,14 @@ function parsePolicyWorkbook(wb) {
     if (!provider) continue;
     const key = normKey(provider);
     if (!key || key.includes('proveedor entrada') || key.includes('proveedores de entrada') || key.includes('proveedores') || key.includes('54 proveedores')) continue;
-    const general = parseNumber(row[1]);
-    const cold = parseNumber(row[2]);
+
+    const generalPolicy = parsePolicyCell(row[1], 'general');
+    const coldPolicy = parsePolicyCell(row[2], 'cold');
+
     rules.set(key, {
       provider,
-      generalDays: Number.isFinite(general) ? general : DEFAULT_POLICY_DAYS,
-      coldDays: Number.isFinite(cold) ? cold : 0,
+      generalPolicy,
+      coldPolicy,
     });
   }
   return rules;
@@ -643,6 +645,14 @@ function enrichRowsWithPolicy() {
   state.rows.forEach(row => Object.assign(row, calculatePolicy(row)));
 }
 
+function policyDaysFromMonths(months) {
+  const n = Number(months);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (Math.abs(n - 12) < 0.000001) return 365;
+  if (Math.abs(n - 9) < 0.000001) return 272;
+  if (Math.abs(n - 6) < 0.000001) return 181;
+  return Math.round(n * 30.4375);
+}
 
 function policyMonthsFromDays(days) {
   const n = Number(days);
@@ -653,8 +663,46 @@ function policyMonthsFromDays(days) {
   return Math.max(1, Math.round(n / 30.4375));
 }
 
-function formatPolicyMonths(days) {
-  const months = policyMonthsFromDays(days);
+function policyValueLooksLikeNoReturn(raw) {
+  const k = normKey(raw);
+  return Boolean(k) && (
+    k.includes('sin politica') ||
+    k.includes('no tiene') ||
+    k.includes('no acepta') ||
+    k.includes('no admite') ||
+    k.includes('sin devolucion') ||
+    k.includes('no devuelve')
+  );
+}
+
+function parsePolicyCell(value, columnType) {
+  const raw = norm(value);
+  if (!raw) {
+    if (columnType === 'general') return { kind: 'months', months: 12, days: DEFAULT_POLICY_DAYS };
+    return { kind: 'inherit' };
+  }
+
+  if (policyValueLooksLikeNoReturn(raw)) return { kind: 'none', months: null, days: 0 };
+
+  const n = parseNumber(raw);
+  if (!Number.isFinite(n)) {
+    if (columnType === 'general') return { kind: 'months', months: 12, days: DEFAULT_POLICY_DAYS };
+    return { kind: 'inherit' };
+  }
+
+  if (n <= 0) {
+    if (columnType === 'general') return { kind: 'none', months: null, days: 0 };
+    return { kind: 'inherit' };
+  }
+
+  if (n <= 36) return { kind: 'months', months: n, days: policyDaysFromMonths(n) };
+
+  return { kind: 'days', months: policyMonthsFromDays(n), days: n };
+}
+
+function formatPolicy(policy) {
+  if (!policy || policy.kind === 'none') return 'Sin devolución';
+  const months = policy.months || policyMonthsFromDays(policy.days);
   if (!months) return 'Sin devolución';
   return `Política ${months} ${months === 1 ? 'mes' : 'meses'}`;
 }
@@ -662,23 +710,25 @@ function formatPolicyMonths(days) {
 function calculatePolicy(row) {
   const supplierKey = normKey(row.supplier);
   const rule = state.policyRules.get(supplierKey);
-  const generalDays = rule ? rule.generalDays : DEFAULT_POLICY_DAYS;
-  const coldDays = rule ? rule.coldDays : 0;
   const source = rule ? 'Política proveedor' : 'Norma general';
 
-  if (generalDays === 0) {
+  const defaultPolicy = { kind: 'months', months: 12, days: DEFAULT_POLICY_DAYS };
+  const generalPolicy = rule ? rule.generalPolicy : defaultPolicy;
+  const coldPolicy = rule ? rule.coldPolicy : { kind: 'inherit' };
+  const effectivePolicy = isCold(row.cold) && coldPolicy && coldPolicy.kind !== 'inherit' ? coldPolicy : generalPolicy;
+
+  if (!effectivePolicy || effectivePolicy.kind === 'none' || effectivePolicy.days === 0) {
     return {
       policyStatus: 'No acepta devolución',
       policyThresholdDays: 0,
       policyBasis: 'Sin devolución',
-      policyNote: 'Proveedor marcado con política 0',
+      policyNote: 'Proveedor marcado como no acepta devolución',
       policySource: source,
     };
   }
 
-  const coldApplies = isCold(row.cold) && coldDays > 0;
-  const threshold = coldApplies ? coldDays : generalDays;
-  const basis = formatPolicyMonths(threshold);
+  const threshold = effectivePolicy.days || DEFAULT_POLICY_DAYS;
+  const basis = formatPolicy(effectivePolicy);
 
   if (row.daysLife === null || row.daysLife === undefined || !Number.isFinite(Number(row.daysLife))) {
     return {

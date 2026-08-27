@@ -1,61 +1,32 @@
-# Caducados PROVESA v3.17
+# Caducados PROVESA v3.18
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Cambios v3.17
+## Cambios v3.18
 
-1. **Base política en meses**
-   - El desplegable de Lotes ya no muestra textos como `General: 365 días`.
-   - Ahora muestra la política de caducidad en meses, por ejemplo `Política 12 meses`, `Política 9 meses` o `Política 6 meses`.
-   - Para Merck frío, se muestra `Política 6 meses`; para Merck no frío, `Política 9 meses`.
+1. **Políticas de caducidad en meses**
+   - El archivo `assets/politicas-caducidad-proveedores.xlsx` ahora se interpreta en meses.
+   - Ejemplos:
+     - `12` = Política 12 meses.
+     - `9` = Política 9 meses.
+     - `6` = Política 6 meses.
 
-## Cambios v3.16
+2. **Proveedores sin devolución**
+   - La app interpreta textos como `Sin politica`, `Sin política`, `No tiene`, `No acepta`, `No admite` o `Sin devolución` como:
+     - **No acepta devolución**.
 
-1. **Títulos en los Excel de gestión**
-   - Todas las exportaciones de gestión incluyen un título en la primera fila.
-   - El título usa los valores de filtros en este orden:
-     - Caducidad
-     - Política
-     - Proveedor
-     - Tipo artículo
-     - Almacén
-   - Se muestran los valores, no los nombres de los filtros.
-   - Ejemplo: `Caducados actuales - En política - FATRO - Almacén 01`.
+3. **Compatibilidad con archivo anterior**
+   - Si en la columna general aparece `0`, se interpreta como **no acepta devolución**.
+   - Si en la columna de frío aparece `0` o está vacía, se interpreta como **sin política especial de frío**, usando la política general.
 
-2. **Producción fuera política**
-   - Reordenada la exportación a:
-     - Descripción
-     - Cantidad
-     - Lote
-     - Caducidad
-     - Última entrada
-     - Última venta
-     - Cliente
-     - Acción/respuesta
+4. **Nuevo Excel de políticas incluido**
+   - Sustituido el archivo de políticas por el último aportado por Ramón.
 
-3. **Caducados fuera de política**
-   - Añadida la columna **Caducidad** después de **Lote**.
-   - Columnas finales:
-     - Nº artículo
-     - Descripción
-     - Cantidad
-     - Lote
-     - Caducidad
+## Base mantenida desde v3.17
 
-4. **Caducados en política**
-   - Añadida la columna **Caducidad**.
-   - Columnas finales:
-     - Nº artículo
-     - Descripción
-     - Cantidad
-     - Lote
-     - Caducidad
-     - Albarán de compra
-     - Fecha de compra
-
-## Base mantenida desde v3.15
-
-- Fechas en formato fijo `dd/mm/aaaa`.
+- Base política mostrada en meses en el desplegable de Lotes.
+- Títulos en los Excel de gestión.
+- Fechas `dd/mm/aaaa`.
 - Cantidades enteras sin decimales ni coma final.
 - Producción fuera política contemplando almacenes **01 + 02** juntos.
 - Exportaciones ordenadas por caducidad y con fila en blanco entre meses cuando corresponde.
