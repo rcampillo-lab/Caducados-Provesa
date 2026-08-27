@@ -96,6 +96,13 @@ const MANAGEMENT_STEPS = {
 
 const el = (id) => document.getElementById(id);
 const fmtNum = (n, d = 0) => Number(n || 0).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d });
+const fmtQty = (n) => {
+  const value = Number(n || 0);
+  if (!Number.isFinite(value)) return '';
+  const rounded = Math.round(value);
+  if (Math.abs(value - rounded) < 0.000001) return rounded.toLocaleString('es-ES', { maximumFractionDigits: 0 });
+  return value.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+};
 const norm = (v) => String(v ?? '').trim();
 const normKey = (v) => norm(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
@@ -1014,11 +1021,11 @@ function lotColumns() {
     ['Nota recl.', r => currentClaim(r) ? escapeHtml(currentClaim(r).note || '') : ''],
     ['Nº artículo', r => r.item],
     ['Descripción', r => r.desc],
-    ['Proveedor entrada', r => r.supplier],
+    ['Cantidad', r => fmtQty(r.stock), 'num'],
     ['Lote', r => r.lot],
-    ['Almacén', r => r.warehouse],
-    ['Stock', r => fmtNum(r.stock, 2), 'num'],
     ['Caducidad', r => fmtDate(r.exp)],
+    ['Proveedor entrada', r => r.supplier],
+    ['Almacén', r => r.warehouse],
     ['Estado', r => badge(r.status, r.daysExp)],
     ['Política', r => policyBadge(r.policyStatus)],
   ];

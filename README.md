@@ -1,4 +1,4 @@
-# Caducados PROVESA v3.11
+# Caducados PROVESA v3.12
 
 App estática tipo **Other** para Vercel/GitHub.
 
@@ -151,6 +151,13 @@ Sin build command, sin `package.json` y sin `vercel.json`.
 
 
 
-## v3.11
+## v3.12
 - La exportación **Producción fuera política** se ordena por fecha de caducidad ascendente, dejando arriba lo que caduca antes.
 - La exportación **Producción fuera política** inserta una fila en blanco entre meses de caducidad, igual que la exportación de ofertas de compañía.
+
+
+## Cambios v3.12
+
+- Reordenadas las columnas principales de la sección Lotes.
+- La columna Stock pasa a llamarse Cantidad.
+- Cantidad se muestra sin decimales cuando el valor es entero, y con decimales solo cuando el artículo los tenga.
