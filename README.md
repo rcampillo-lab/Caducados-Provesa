@@ -1,8 +1,8 @@
-# Caducados PROVESA v3.19
+# Caducados PROVESA v3.20
 
 App estática tipo **Other** para Vercel/GitHub.
 
-## Cambios v3.19
+## Cambios v3.20
 
 1. **Políticas de caducidad en meses**
    - El archivo `assets/politicas-caducidad-proveedores.xlsx` ahora se interpreta en meses.
@@ -42,8 +42,15 @@ App estática tipo **Other** para Vercel/GitHub.
 La gestión se guarda en el navegador mediante almacenamiento local.
 
 
-## v3.19
+## v3.20
 
 - La política de caducidad se calcula contra la compra/entrada del lote (`Fecha entrada real`) y la fecha de caducidad del lote.
 - Ya no depende de la última compra del artículo, que puede pertenecer a otro lote.
 - Si el Excel de SAP trae el campo `Días vida útil al entrar`, solo se usa como respaldo cuando no se puede calcular desde la entrada real del lote.
+
+
+## v3.20
+
+- Corregida política de MERCK SHARP & DOHME ANIMAL HEALTH, S.L.: general 9 meses y frío 6 meses.
+- El desplegable muestra la base como `Política: X meses`.
+- La política se sigue calculando contra la fecha de entrada real del lote.

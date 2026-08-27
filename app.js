@@ -705,7 +705,7 @@ function formatPolicy(policy) {
   if (!policy || policy.kind === 'none') return 'Sin devolución';
   const months = policy.months || policyMonthsFromDays(policy.days);
   if (!months) return 'Sin devolución';
-  return `Política ${months} ${months === 1 ? 'mes' : 'meses'}`;
+  return `Política: ${months} ${months === 1 ? 'mes' : 'meses'}`;
 }
 
 function calculatePolicy(row) {
