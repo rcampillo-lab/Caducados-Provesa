@@ -436,15 +436,15 @@ function exportClaims() {
   const data = values
     .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
     .map(c => ({
+      'Nº artículo': c.item || '',
+      'Descripción': c.desc || '',
+      'Cantidad': c.stock || 0,
+      'Lote': c.lot || '',
+      'Caducidad': fmtDate(c.exp),
       'Estado gestión': normalizeGestionStatus(c.status),
       'Nota gestión': c.note || '',
       'Fecha gestión': c.updatedAt ? fmtDate(c.updatedAt) : '',
-      'Nº artículo': c.item || '',
-      'Descripción artículo': c.desc || '',
-      'Lote': c.lot || '',
       'Almacén': c.warehouse || '',
-      'Fecha caducidad': fmtDate(c.exp),
-      'Stock al marcar': c.stock || 0,
       'Proveedor entrada': c.supplier || '',
       'Nº entrada mercancía': c.entryDoc || '',
       'ID caducidad': c.id || '',
@@ -452,8 +452,8 @@ function exportClaims() {
 
   const ws = XLSX.utils.json_to_sheet(data);
   ws['!cols'] = [
-    { wch: 18 }, { wch: 35 }, { wch: 20 }, { wch: 11 }, { wch: 35 }, { wch: 15 },
-    { wch: 10 }, { wch: 14 }, { wch: 13 }, { wch: 28 }, { wch: 14 }, { wch: 70 }
+    { wch: 11 }, { wch: 35 }, { wch: 13 }, { wch: 15 }, { wch: 14 }, { wch: 18 },
+    { wch: 35 }, { wch: 20 }, { wch: 10 }, { wch: 28 }, { wch: 14 }, { wch: 70 }
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Reclamaciones');
@@ -529,7 +529,7 @@ function mapRow(row) {
     lastLotSaleDate: get(row, COLS.lastLotSaleDate),
     lastLotClient: norm(get(row, COLS.lastLotClient)),
     lastLotSaleDoc: norm(get(row, COLS.lastLotSaleDoc)),
-    policyStatus: '',
+    policyStatus: 'Fuera de política',
     policyThresholdDays: null,
     policyBasis: '',
     policyNote: '',
@@ -558,12 +558,8 @@ function badge(text, days) {
 }
 
 function policyBadge(status) {
-  const s = status || 'Sin política definida';
-  let cls = 'blue';
-  if (s === 'En política') cls = 'red';
-  else if (s === 'Fuera de política') cls = 'green';
-  else if (s === 'No acepta devolución') cls = 'yellow';
-  else if (s === 'Sin fecha entrada') cls = 'orange';
+  const s = status === 'En política' ? 'En política' : 'Fuera de política';
+  const cls = s === 'En política' ? 'red' : 'green';
   return `<span class="badge ${cls}">${escapeHtml(s)}</span>`;
 }
 
@@ -601,7 +597,7 @@ function setup() {
 function initializeEmbeddedPolicies() {
   state.policyRules = new Map();
   state.policyLoaded = true;
-  state.policyFileName = 'Políticas internas v3.22';
+  state.policyFileName = 'Políticas internas v3.23';
   enrichRowsWithPolicy();
   applyClaimsToRows();
   updateStatusCard();
@@ -619,6 +615,12 @@ function embeddedPolicyRules() {
     {
       provider: 'VETNOVA',
       match: key => key.includes('vetnova'),
+      generalPolicy: { kind: 'none', months: null, days: 0 },
+      coldPolicy: { kind: 'none', months: null, days: 0 },
+    },
+    {
+      provider: 'KERSIA',
+      match: key => key.includes('kersia'),
       generalPolicy: { kind: 'none', months: null, days: 0 },
       coldPolicy: { kind: 'none', months: null, days: 0 },
     },
@@ -768,10 +770,10 @@ function calculatePolicy(row) {
 
   if (!effectivePolicy || effectivePolicy.kind === 'none' || effectivePolicy.days === 0) {
     return {
-      policyStatus: 'No acepta devolución',
+      policyStatus: 'Fuera de política',
       policyThresholdDays: 0,
       policyBasis: 'Política: No tiene',
-      policyNote: 'Proveedor marcado como no acepta devolución',
+      policyNote: 'Proveedor sin política de caducidad; todos sus artículos están fuera de política',
       policySource: source,
     };
   }
@@ -781,7 +783,7 @@ function calculatePolicy(row) {
 
   if (row.daysLife === null || row.daysLife === undefined || !Number.isFinite(Number(row.daysLife))) {
     return {
-      policyStatus: 'Sin fecha entrada',
+      policyStatus: 'Fuera de política',
       policyThresholdDays: threshold,
       policyBasis: basis,
       policyNote: 'No hay fecha de compra/entrada del lote para comparar con caducidad',
@@ -966,11 +968,11 @@ function syncDynamicFilterOptions() {
     filters.supplier
   ) || changed;
 
-  const policyOrder = ['En política', 'Fuera de política', 'No acepta devolución', 'Sin fecha entrada', 'Sin política definida'];
+  const policyOrder = ['En política', 'Fuera de política'];
   const policyRows = optionRowsFor('policy', filters);
   const policyCounts = new Map();
   for (const r of policyRows) {
-    const value = r.policyStatus || 'Sin política definida';
+    const value = isInPolicy(r) ? 'En política' : 'Fuera de política';
     policyCounts.set(value, (policyCounts.get(value) || 0) + 1);
   }
   const policyOptions = policyOrder
@@ -1736,25 +1738,21 @@ function exportProductionOutPolicy() {
 
   const sortedRows = groupRows(
     rows,
-    r => [r.desc, r.lot, toIsoDate(r.exp)].join('|'),
+    r => [r.item, r.desc, r.lot, toIsoDate(r.exp)].join('|'),
     r => ({
+      'Nº artículo': r.item,
       'Descripción': r.desc,
       'Cantidad': r.stock,
       'Lote': r.lot,
       'Caducidad': fmtDate(r.exp),
-      'Última entrada': fmtDate(r.lastPurchaseDate),
       'Última venta': fmtDate(r.lastArticleSaleDate),
       'Cliente': r.lastArticleClient || '',
       'Acción/respuesta': '',
       '_sortCaducidad': toIsoDate(r.exp),
-      _lastEntryArticleRaw: r.lastPurchaseDate,
       _lastSaleRaw: r.lastArticleSaleDate,
     }),
     (acc, r) => {
       acc['Cantidad'] += r.stock;
-      const entry = maxDateValue(acc._lastEntryArticleRaw, r.lastPurchaseDate);
-      acc._lastEntryArticleRaw = entry;
-      acc['Última entrada'] = fmtDate(entry);
       const sale = maxDateValue(acc._lastSaleRaw, r.lastArticleSaleDate);
       if (toIsoDate(sale) !== toIsoDate(acc._lastSaleRaw)) acc['Cliente'] = r.lastArticleClient || acc['Cliente'];
       acc._lastSaleRaw = sale;
@@ -1766,7 +1764,7 @@ function exportProductionOutPolicy() {
     String(a['Lote']).localeCompare(String(b['Lote']), 'es')
   );
 
-  const columns = ['Descripción', 'Cantidad', 'Lote', 'Caducidad', 'Última entrada', 'Última venta', 'Cliente', 'Acción/respuesta'];
+  const columns = ['Nº artículo', 'Descripción', 'Cantidad', 'Lote', 'Caducidad', 'Última venta', 'Cliente', 'Acción/respuesta'];
   const blankRow = Object.fromEntries(columns.map(col => [col, '']));
   const data = [];
   let previousMonth = '';
@@ -1774,14 +1772,14 @@ function exportProductionOutPolicy() {
   for (const row of sortedRows) {
     const monthKey = String(row['_sortCaducidad'] || '').slice(0, 7);
     if (previousMonth && monthKey && monthKey !== previousMonth) data.push({ ...blankRow });
-    const { _sortCaducidad, _lastEntryArticleRaw, _lastSaleRaw, ...visibleRow } = row;
+    const { _sortCaducidad, _lastSaleRaw, ...visibleRow } = row;
     data.push(visibleRow);
     if (monthKey) previousMonth = monthKey;
   }
 
   writeGestionWorkbook(
     'produccion_fuera_politica_almacenes_01_02',
-    [{ name: 'Producción fuera política', kind: 'productionOutPolicy', data, widths: [38, 10, 14, 14, 17, 17, 28, 24] }]
+    [{ name: 'Producción fuera política', kind: 'productionOutPolicy', data, widths: [12, 38, 10, 14, 14, 17, 28, 24] }]
   );
 }
 
@@ -1934,14 +1932,14 @@ function exportView() {
   const title = makeExportTitle();
   const data = state.filtered.map(r => ({
     'Nº artículo': r.item,
-    'Descripción artículo': r.desc,
+    'Descripción': r.desc,
+    'Cantidad': r.stock,
     'Lote': r.lot,
-    'Fecha caducidad': fmtDate(r.exp),
+    'Caducidad': fmtDate(r.exp),
     'Estado caducidad': r.status,
-    'Política caducidad': r.policyStatus,
+    'Política caducidad': isInPolicy(r) ? 'En política' : 'Fuera de política',
     'Estado gestión': gestionStatus(r),
     'Nota gestión': currentClaim(r)?.note || '',
-    'Stock': r.stock,
     'Fecha entrada real': fmtDate(r.entryDate),
     'Último cliente que compró artículo': r.lastArticleClient,
     'Proveedor entrada': r.supplier,
@@ -1959,14 +1957,14 @@ function exportView() {
   ws['!rows'] = [{ hpt: 24 }, { hpt: 6 }, { hpt: 22 }];
   ws['!cols'] = [
     { wch: 11 }, // Nº artículo
-    { wch: 32 }, // Descripción artículo
+    { wch: 32 }, // Descripción
+    { wch: 9 },  // Cantidad
     { wch: 13 }, // Lote
     { wch: 12 }, // Fecha caducidad
     { wch: 18 }, // Estado caducidad
     { wch: 18 }, // Política caducidad
     { wch: 18 }, // Estado gestión
     { wch: 28 }, // Nota gestión
-    { wch: 9 },  // Stock
     { wch: 12 }, // Entrada
     { wch: 24 }, // Último cliente
     { wch: 24 }, // Proveedor entrada

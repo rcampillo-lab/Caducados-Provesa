@@ -1,4 +1,18 @@
-# Caducados PROVESA v3.22
+# Caducados PROVESA v3.23
+
+## Cambios v3.23
+
+- Todos los listados Excel empiezan por **Nº artículo, Descripción, Cantidad, Lote y Caducidad**, incluida la vista filtrada y las reclamaciones.
+- El listado de producción/ganadería fuera de política incorpora el número de artículo y elimina la última entrada. Muestra **Última venta**, con la fecha del último albarán del artículo y su cliente.
+- Producción agrupa por número de artículo, descripción, lote y caducidad para evitar mezclar artículos diferentes con la misma descripción.
+- Solo existen dos estados de caducidad: **En política** y **Fuera de política**. Los proveedores sin política y los lotes sin datos suficientes para calcularla quedan fuera de política, también en filtros y gestión guiada.
+- **KERSIA**, **FATRO** y **VETNOVA** no tienen política de caducidad: todos sus artículos están **Fuera de política**.
+- Se mantienen las políticas internas: 12 meses por defecto; MERCK/MSD, 6 meses para frío y 9 meses para el resto.
+- En reclamaciones, **Cantidad** corresponde al stock guardado al marcar la gestión.
+
+## Uso
+
+Descomprime el ZIP y abre `index.html`, o sube el contenido de la carpeta de la app a tu alojamiento estático. Carga el Excel de SAP como en v3.22. La biblioteca Excel requiere conexión a Internet, igual que en la versión anterior.
 
 ## Cambios v3.22
 
